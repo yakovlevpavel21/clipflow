@@ -2,7 +2,7 @@
 import { Play, Clock, Calendar, User } from 'lucide-react';
 
 export default function TaskCardUploader({ task, onReview }) {
-  const thumbUrl = `http://localhost:5000/${task.originalVideo?.thumbnailPath}`;
+  const thumbUrl = `${import.meta.env.VITE_API_URL}/${task.originalVideo?.thumbnailPath}`;
   
   // Форматирование даты обновления (когда креатор загрузил видео)
   const dateObj = new Date(task.updatedAt);
@@ -42,7 +42,7 @@ export default function TaskCardUploader({ task, onReview }) {
                   <User size={12} />
                   {task.creator?.username || 'Система'}
                 </div>
-                
+
                 <div className="flex items-center gap-1 text-slate-400 text-[11px] font-medium">
                   <Clock size={12} /> {Math.floor(task.originalVideo?.duration / 60)}:{(task.originalVideo?.duration % 60).toString().padStart(2, '0')}
                 </div>

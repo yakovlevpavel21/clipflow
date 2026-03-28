@@ -15,7 +15,7 @@ export default function UploaderPage() {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/uploader/tasks');
+      const res = await axios.get('${import.meta.env.VITE_API_URL}/api/uploader/tasks');
       setTasks(res.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }

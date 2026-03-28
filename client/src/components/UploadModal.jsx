@@ -10,7 +10,7 @@ export default function UploadModal({ task, onClose, onSuccess }) {
   const [previewUrl, setPreviewUrl] = useState(null);
 
   // Ссылка на оригинальный файл на сервере
-  const originalVideoUrl = `http://localhost:5000/${task.originalVideo?.filePath}`;
+  const originalVideoUrl = `${import.meta.env.VITE_API_URL}/${task.originalVideo?.filePath}`;
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -33,7 +33,7 @@ export default function UploadModal({ task, onClose, onSuccess }) {
     const formData = new FormData();
     formData.append('video', selectedFile);
     try {
-      await axios.post(`http://localhost:5000/api/tasks/${task.id}/upload`, formData);
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/tasks/${task.id}/upload`, formData);
       onSuccess();
     } catch (err) {
       alert("Ошибка при загрузке");

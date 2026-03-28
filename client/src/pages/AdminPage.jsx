@@ -24,9 +24,9 @@ export default function AdminPage() {
     setLoading(true);
     try {
       const [u, c, s] = await Promise.all([
-        axios.get('http://localhost:5000/api/admin/users'),
-        axios.get('http://localhost:5000/api/channels'),
-        axios.get('http://localhost:5000/api/admin/settings')
+        axios.get('${import.meta.env.VITE_API_URL}/api/admin/users'),
+        axios.get('${import.meta.env.VITE_API_URL}/api/channels'),
+        axios.get('${import.meta.env.VITE_API_URL}/api/admin/settings')
       ]);
       setUsers(u.data);
       setChannels(c.data);
@@ -38,32 +38,32 @@ export default function AdminPage() {
 
   const handleAddUser = async () => {
     if (!newUser.username || !newUser.password) return;
-    await axios.post('http://localhost:5000/api/admin/users', newUser);
+    await axios.post('${import.meta.env.VITE_API_URL}/api/admin/users', newUser);
     setNewUser({ username: '', password: '', role: 'CREATOR' });
     fetchData();
   };
 
   const handleAddChannel = async () => {
     if (!newChannel) return;
-    await axios.post('http://localhost:5000/api/admin/channels', { name: newChannel });
+    await axios.post('${import.meta.env.VITE_API_URL}/api/admin/channels', { name: newChannel });
     setNewChannel('');
     fetchData();
   };
 
   const updateChannel = async (id, data) => {
     try {
-      await axios.patch(`http://localhost:5000/api/admin/channels/${id}`, data);
+      await axios.patch(`${import.meta.env.VITE_API_URL}/api/admin/channels/${id}`, data);
     } catch (err) { alert("Ошибка сохранения"); }
   };
 
   const saveProxy = async () => {
-    await axios.post('http://localhost:5000/api/admin/settings', { key: 'proxy_url', value: proxy });
+    await axios.post('${import.meta.env.VITE_API_URL}/api/admin/settings', { key: 'proxy_url', value: proxy });
     alert("Настройки прокси обновлены");
   };
 
   const deleteItem = async (type, id) => {
     if (!confirm("Удалить безвозвратно?")) return;
-    await axios.delete(`http://localhost:5000/api/admin/${type}/${id}`);
+    await axios.delete(`${import.meta.env.VITE_API_URL}/api/admin/${type}/${id}`);
     fetchData();
   };
 

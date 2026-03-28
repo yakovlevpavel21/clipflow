@@ -13,8 +13,8 @@ export default function PublishModal({ task, onClose, onSuccess }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
 
-  const reactionUrl = `http://localhost:5000/${task.reactionFilePath}`;
-  const originalUrl = `http://localhost:5000/${task.originalVideo.filePath}`;
+  const reactionUrl = `${import.meta.env.VITE_API_URL}/${task.reactionFilePath}`;
+  const originalUrl = `${import.meta.env.VITE_API_URL}/${task.originalVideo.filePath}`;
 
   const handleCopy = (text, field) => {
     navigator.clipboard.writeText(text);
@@ -25,7 +25,7 @@ export default function PublishModal({ task, onClose, onSuccess }) {
   const onPublish = async () => {
     if (!youtubeUrl) return alert("Введите ссылку на YouTube!");
     try {
-      await axios.post(`http://localhost:5000/api/tasks/${task.id}/publish`, { youtubeUrl, scheduledAt });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/tasks/${task.id}/publish`, { youtubeUrl, scheduledAt });
       onSuccess();
     } catch (err) { alert("Ошибка сохранения"); }
   };
@@ -33,7 +33,7 @@ export default function PublishModal({ task, onClose, onSuccess }) {
   const onReject = async () => {
     if (!rejectionReason) return alert("Укажите причину!");
     try {
-      await axios.post(`http://localhost:5000/api/tasks/${task.id}/reject`, { reason: rejectionReason });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/tasks/${task.id}/reject`, { reason: rejectionReason });
       onSuccess();
     } catch (err) { alert("Ошибка"); }
   };
