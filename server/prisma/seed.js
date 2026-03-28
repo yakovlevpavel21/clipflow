@@ -2,21 +2,32 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Создаем тестовые каналы
-  const channel1 = await prisma.channel.create({ data: { name: 'Shorts Factory' } });
-  const channel2 = await prisma.channel.create({ data: { name: 'Daily Reactions' } });
+  // Удаляем старые данные (опционально, если хочешь полную очистку)
+  // await prisma.task.deleteMany();
+  // await prisma.channel.deleteMany();
 
-  // Создаем пользователей
-  const manager = await prisma.user.create({
-    data: { username: 'manager1', password: '123', role: 'MANAGER' }
-  });
-  const creator = await prisma.user.create({
-    data: { username: 'ivan_creator', password: '123', role: 'CREATOR' }
+  const admin = await prisma.user.upsert({
+    where: { username: 'admin' },
+    update: {
+      password: 'admin', // Дефолтный пароль
+      role: 'ADMIN'
+    },
+    create: {
+      username: 'admin',
+      password: 'admin',
+      role: 'ADMIN'
+    }
   });
 
-  console.log('Seed data created!');
+  console.log('✅ База данных инициализирована!');
+  console.log('Данные для входа: admin / admin');
 }
 
 main()
-  .catch((e) => console.error(e))
-  .finally(async () => await prisma.$disconnect());
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
