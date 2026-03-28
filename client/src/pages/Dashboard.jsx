@@ -13,7 +13,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await axios.get('${import.meta.env.VITE_API_URL}/api/stats');
+        const res = await axios.get('/api/stats');
         setStats(res.data);
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
@@ -133,7 +133,7 @@ export default function Dashboard() {
                 <div key={task.id} className="flex items-center gap-4 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-900/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 transition-all group">
                   <div className="w-10 h-14 rounded-lg overflow-hidden shrink-0 border border-white dark:border-slate-700 shadow-sm">
                     {task.originalVideo?.thumbnailPath ? (
-                      <img src={`${import.meta.env.VITE_API_URL}/${task.originalVideo.thumbnailPath}`} className="w-full h-full object-cover" alt="" />
+                      <img src={`/${task.originalVideo.thumbnailPath}`} className="w-full h-full object-cover" alt="" />
                     ) : (
                       <div className="w-full h-full bg-slate-200 dark:bg-slate-800" />
                     )}

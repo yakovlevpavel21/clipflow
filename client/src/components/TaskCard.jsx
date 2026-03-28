@@ -2,7 +2,7 @@
 import { Download, Play, Clock, UserCheck, Undo2, FileVideo, Eye, ExternalLink, PlayCircle, RotateCcw } from 'lucide-react';
 
 export default function TaskCard({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCancelUpload }) {
-  const thumbUrl = `${import.meta.env.VITE_API_URL}/${task.originalVideo?.thumbnailPath}`;
+  const thumbUrl = `/${task.originalVideo?.thumbnailPath}`;
   const isHistory = mode === 'history';
   const isMy = mode === 'my';
   const isAvailable = mode === 'available';
@@ -104,7 +104,7 @@ export default function TaskCard({ task, mode, onClaim, onAbandon, onUpload, onP
                 </button>
               )}
 
-              <a href={`${import.meta.env.VITE_API_URL}/${task.originalVideo.filePath}`} download className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-blue-600 rounded-lg border dark:border-slate-700 transition-colors">
+              <a href={`/${task.originalVideo.filePath}`} download className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-blue-600 rounded-lg border dark:border-slate-700 transition-colors">
                 <Download size={16} />
               </a>
               <button onClick={onAbandon} className="text-slate-400 hover:text-red-500 transition-colors ml-1" title="Отказаться">

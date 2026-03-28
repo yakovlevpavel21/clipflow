@@ -2,7 +2,7 @@
 import { Play, Clock, Calendar, User } from 'lucide-react';
 
 export default function TaskCardUploader({ task, onReview }) {
-  const thumbUrl = `${import.meta.env.VITE_API_URL}/${task.originalVideo?.thumbnailPath}`;
+  const thumbUrl = `/${task.originalVideo?.thumbnailPath}`;
   
   // Форматирование даты обновления (когда креатор загрузил видео)
   const dateObj = new Date(task.updatedAt);

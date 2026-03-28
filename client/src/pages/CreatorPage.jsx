@@ -22,10 +22,10 @@ export default function CreatorPage() {
   const fetchAll = async () => {
     try {
       const [avail, mine, hist, chan] = await Promise.all([
-        axios.get('${import.meta.env.VITE_API_URL}/api/tasks/available'),
-        axios.get('${import.meta.env.VITE_API_URL}/api/tasks/my-work'),
-        axios.get('${import.meta.env.VITE_API_URL}/api/tasks/history'),
-        axios.get('${import.meta.env.VITE_API_URL}/api/channels')
+        axios.get('/api/tasks/available'),
+        axios.get('/api/tasks/my-work'),
+        axios.get('/api/tasks/history'),
+        axios.get('/api/channels')
       ]);
       setTasks({ available: avail.data, my: mine.data, history: hist.data });
       setChannels(chan.data);
@@ -36,7 +36,7 @@ export default function CreatorPage() {
   const handleCancelUpload = async (id) => {
     if (!confirm("Отозвать видео с проверки? Оно вернется во вкладку 'В процессе'.")) return;
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/tasks/${id}/cancel-upload`);
+      await axios.post(`/api/tasks/${id}/cancel-upload`);
       fetchAll();
     } catch (err) { alert("Ошибка при отмене"); }
   };
@@ -44,8 +44,8 @@ export default function CreatorPage() {
   // Функция открытия нового плеера
   const handleOpenPreview = (task, type = 'original') => {
     const url = type === 'original' 
-      ? `${import.meta.env.VITE_API_URL}/${task.originalVideo.filePath}`
-      : `${import.meta.env.VITE_API_URL}/${task.reactionFilePath}`;
+      ? `/${task.originalVideo.filePath}`
+      : `/${task.reactionFilePath}`;
     
     setActivePreview({
       url,
@@ -129,8 +129,8 @@ export default function CreatorPage() {
               // ВАЖНО: вызываем новую функцию handleOpenPreview
               onPreview={handleOpenPreview} 
               onUpload={() => setUploadTarget(task)}
-              onClaim={() => axios.post(`${import.meta.env.VITE_API_URL}/api/tasks/${task.id}/claim`).then(fetchAll)}
-              onAbandon={() => confirm("Отказаться?") && axios.post(`${import.meta.env.VITE_API_URL}/api/tasks/${task.id}/abandon`).then(fetchAll)}
+              onClaim={() => axios.post(`/api/tasks/${task.id}/claim`).then(fetchAll)}
+              onAbandon={() => confirm("Отказаться?") && axios.post(`/api/tasks/${task.id}/abandon`).then(fetchAll)}
               onCancelUpload={handleCancelUpload}
             />
           ))

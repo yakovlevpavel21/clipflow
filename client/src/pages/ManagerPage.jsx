@@ -1,6 +1,7 @@
 // client/src/pages/ManagerPage.jsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from '../api';
 import { io } from 'socket.io-client';
 import { 
   Link2, Sparkles, Clock, AlertCircle, CheckCircle2, 
@@ -8,7 +9,7 @@ import {
 } from 'lucide-react';
 import VideoModal from '../components/VideoModal';
 
-const socket = io('${import.meta.env.VITE_API_URL}');
+const socket = io(API_URL || window.location.origin);
 
 export default function ManagerPage() {
   const [url, setUrl] = useState('');
@@ -26,7 +27,7 @@ export default function ManagerPage() {
   useEffect(() => {
     const fetchChannels = async () => {
       try {
-        const res = await axios.get('${import.meta.env.VITE_API_URL}/api/channels');
+        const res = await axios.get('/api/channels');
         setChannels(res.data);
       } catch (err) { console.error(err); }
     };
@@ -50,7 +51,7 @@ export default function ManagerPage() {
     const isRetry = videoInfo && videoInfo.status === 'ERROR';
 
     try {
-      const response = await axios.post('${import.meta.env.VITE_API_URL}/api/tasks/fetch-info', { 
+      const response = await axios.post('/api/tasks/fetch-info', { 
         url, force: isRetry, useProxy 
       });
       setVideoInfo(response.data);
@@ -64,7 +65,7 @@ export default function ManagerPage() {
 
   const fetchPendingTasks = async () => {
     try {
-      const res = await axios.get('${import.meta.env.VITE_API_URL}/api/tasks/available');
+      const res = await axios.get('/api/tasks/available');
       setPendingTasks(res.data);
     } catch (err) { console.error(err); }
   };
@@ -72,7 +73,7 @@ export default function ManagerPage() {
   const handleDeleteTask = async (id) => {
     if (!confirm("Удалить задачу из ленты креаторов?")) return;
     try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/api/tasks/${id}`);
+      await axios.delete(`/api/tasks/${id}`);
       fetchPendingTasks(); // Обновляем список
       // Также можно вызвать handleCheckVideo(), чтобы обновить кружочки на каналах
     } catch (err) { alert("Ошибка при удалении"); }
@@ -91,7 +92,7 @@ export default function ManagerPage() {
 
     try {
       // ИСПРАВЛЕНО: передаем правильное значение приоритета
-      await axios.post('${import.meta.env.VITE_API_URL}/api/tasks', {
+      await axios.post('/api/tasks', {
         originalVideoId: videoInfo.id,
         channelIds: selectedChannels,
         priority: isUrgent ? 'urgent' : 'normal' 
@@ -196,10 +197,10 @@ export default function ManagerPage() {
                 {/* Horizontal Card Preview */}
                 <div className="bg-white dark:bg-[#1a1f2e] p-3 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 items-center">
                   <div 
-                    onClick={() => setActivePreview({ url: `${import.meta.env.VITE_API_URL}/${videoInfo.filePath}`, title: videoInfo.title })}
+                    onClick={() => setActivePreview({ url: `/${videoInfo.filePath}`, title: videoInfo.title })}
                     className="relative w-full sm:w-44 aspect-video rounded-xl overflow-hidden bg-black shrink-0 cursor-pointer group"
                   >
-                    <img src={`${import.meta.env.VITE_API_URL}/${videoInfo.thumbnailPath}`} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" alt="thumb" />
+                    <img src={`/${videoInfo.thumbnailPath}`} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" alt="thumb" />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                       <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
                         <Play fill="white" size={16} />
@@ -347,7 +348,7 @@ export default function ManagerPage() {
               <div key={task.id} className="bg-white dark:bg-[#1a1f2e] p-3 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 group">
                 {/* Мини-превью */}
                 <div className="w-16 aspect-video rounded-lg overflow-hidden bg-black shrink-0 shadow-sm border border-black/5">
-                   <img src={`${import.meta.env.VITE_API_URL}/${task.originalVideo?.thumbnailPath}`} className="w-full h-full object-cover" alt="" />
+                   <img src={`/${task.originalVideo?.thumbnailPath}`} className="w-full h-full object-cover" alt="" />
                 </div>
 
                 {/* Инфо */}
