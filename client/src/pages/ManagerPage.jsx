@@ -8,7 +8,9 @@ import {
 } from 'lucide-react';
 import VideoModal from '../components/VideoModal';
 
-const socket = io();
+const socket = io({
+  path: '/socket.io'
+});
 
 export default function ManagerPage() {
   const [url, setUrl] = useState('');
