@@ -10,23 +10,24 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await axios.get('/api/stats');
-        setStats(res.data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
-    };
-    fetchStats();
-  }, []);
+  const fetchStats = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get('/api/stats');
+      setStats(res.data);
+    } catch (err) {
+      setError("Не удалось загрузить аналитику");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (loading || !stats) return (
-    <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-blue-600" size={40} />
-      <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Загрузка аналитики...</span>
-    </div>
-  );
+  useEffect(() => { fetchStats(); }, []);
+
+  if (loading || error) {
+    return <PageStatus loading={loading} error={error} onRetry={fetchStats} />;
+  }
 
   const { counters, channels, recent } = stats;
 

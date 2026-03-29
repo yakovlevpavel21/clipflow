@@ -28,18 +28,24 @@ export default function Layout({ onLogout, user }) {
       
       {/* --- MOBILE HEADER --- */}
       <header className="lg:hidden flex items-center justify-between p-4 bg-white dark:bg-[#1a1f2e] border-b dark:border-slate-800 sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Zap size={18} className="text-white" fill="currentColor" />
-          </div>
-          <h1 className="text-xl font-bold tracking-tight uppercase">ClipFlow</h1>
-        </div>
+        {/* 1. Кнопка меню СЛЕВА */}
         <button 
           onClick={() => setIsMenuOpen(true)}
-          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+          className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 active:scale-90 transition-all border border-slate-100 dark:border-slate-700"
         >
           <Menu size={24} />
         </button>
+
+        {/* 2. Логотип ПО ЦЕНТРУ */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <Zap size={18} className="text-white" fill="currentColor" />
+          </div>
+          <h1 className="text-lg font-bold tracking-tight uppercase text-slate-900 dark:text-white">ClipFlow</h1>
+        </div>
+
+        {/* 3. Пустой блок для симметрии (или можешь сюда перенести Sun/Moon) */}
+        <div className="w-10"></div> 
       </header>
 
       {/* --- SIDEBAR --- */}

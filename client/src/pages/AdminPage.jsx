@@ -6,6 +6,7 @@ import {
   Save, Key, UserPlus, Settings as SettingsIcon,
   Shield, CheckCircle2, AlertCircle, Type, Info
 } from 'lucide-react';
+import PageStatus from '../components/PageStatus';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('users'); // users, channels, settings
@@ -13,6 +14,7 @@ export default function AdminPage() {
   const [channels, setChannels] = useState([]);
   const [proxy, setProxy] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   // Формы
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'CREATOR' });
@@ -22,6 +24,7 @@ export default function AdminPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [u, c, s] = await Promise.all([
         axios.get('/api/admin/users'),
@@ -32,8 +35,11 @@ export default function AdminPage() {
       setChannels(c.data);
       const proxySetting = s.data.find(i => i.key === 'proxy_url');
       if (proxySetting) setProxy(proxySetting.value);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError("Не удалось загрузить страницу");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddUser = async () => {
@@ -67,7 +73,9 @@ export default function AdminPage() {
     fetchData();
   };
 
-  if (loading) return <div className="h-[60vh] flex items-center justify-center text-blue-500 font-semibold text-xs uppercase tracking-widest animate-pulse">Загрузка системы...</div>;
+  if (loading || error) {
+    return <PageStatus loading={loading} error={error} onRetry={fetchData} />;
+  }
 
   return (
     <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter']">

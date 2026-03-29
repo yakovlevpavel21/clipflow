@@ -5,6 +5,7 @@ import { Loader2, Zap, X } from 'lucide-react';
 import TaskCard from '../components/TaskCard';
 import UploadModal from '../components/UploadModal';
 import VideoModal from '../components/VideoModal';
+import PageStatus from '../components/PageStatus';
 
 export default function CreatorPage() {
   const [tasks, setTasks] = useState({ available: [], my: [], history: [] });
@@ -13,6 +14,7 @@ export default function CreatorPage() {
   const [tab, setTab] = useState('my'); 
   const [loading, setLoading] = useState(true);
   const [uploadTarget, setUploadTarget] = useState(null);
+  const [error, setError] = useState(null);
   
   // Оставляем только один стейт для плеера
   const [activePreview, setActivePreview] = useState(null); 
@@ -29,8 +31,11 @@ export default function CreatorPage() {
       ]);
       setTasks({ available: avail.data, my: mine.data, history: hist.data });
       setChannels(chan.data);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError("Не удалось загрузить страницу");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancelUpload = async (id) => {
@@ -57,7 +62,9 @@ export default function CreatorPage() {
   const filterFn = (task) => selectedChannel === 'all' || task.channelId === parseInt(selectedChannel);
   const currentTasks = tasks[tab].filter(filterFn);
 
-  if (loading) return <div className="h-[60vh] flex items-center justify-center text-blue-500 font-semibold text-sm uppercase tracking-widest animate-pulse">Загрузка...</div>;
+  if (loading || error) {
+    return <PageStatus loading={loading} error={error} onRetry={fetchAll} />;
+  }
 
   return (
     <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter']">

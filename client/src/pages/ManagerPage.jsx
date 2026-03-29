@@ -1,41 +1,50 @@
-// client/src/pages/ManagerPage.jsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import { 
   Link2, Sparkles, Clock, AlertCircle, CheckCircle2, 
-  Loader2, LayoutGrid, Play, Zap, Globe, Film, Trash2, List 
+  Loader2, LayoutGrid, Play, Zap, Globe, Search, X 
 } from 'lucide-react';
 import VideoModal from '../components/VideoModal';
+import PageStatus from '../components/PageStatus';
 
-const socket = io({
-  path: '/socket.io'
-});
+// Настройка сокета для прогресс-бара
+const socket = io({ path: '/socket.io' });
 
 export default function ManagerPage() {
-  const [url, setUrl] = useState('');
-  const [videoInfo, setVideoInfo] = useState(null); 
-  const [isChecking, setIsChecking] = useState(false); 
+  // Состояния данных
   const [channels, setChannels] = useState([]);
+  const [videoInfo, setVideoInfo] = useState(null);
+  
+  // Состояния интерфейса
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isChecking, setIsChecking] = useState(false);
+  
+  // Состояния формы
+  const [url, setUrl] = useState('');
   const [selectedChannels, setSelectedChannels] = useState([]);
-  const [isUrgent, setIsUrgent] = useState(false); // Состояние для галочки
-  const [status, setStatus] = useState('idle'); 
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isUrgent, setIsUrgent] = useState(false);
   const [useProxy, setUseProxy] = useState(false);
-  const [activePreview, setActivePreview] = useState(null);
-  const [pendingTasks, setPendingTasks] = useState([]);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
-  useEffect(() => {
-    const fetchChannels = async () => {
-      try {
-        const res = await axios.get('/api/channels');
-        setChannels(res.data);
-      } catch (err) { console.error(err); }
-    };
-    fetchChannels();
-    fetchPendingTasks();
-  }, []);
+  // 1. Инициализация (загрузка каналов)
+  const initPage = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get('/api/channels');
+      setChannels(res.data);
+    } catch (err) {
+      setError("Не удалось загрузить список каналов");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => { initPage(); }, []);
+
+  // 2. Слушатель прогресса (Socket.io)
   useEffect(() => {
     socket.on('downloadProgress', (data) => {
       if (videoInfo && data.videoId === videoInfo.videoId) {
@@ -46,85 +55,20 @@ export default function ManagerPage() {
     return () => socket.off('downloadProgress');
   }, [videoInfo?.videoId]);
 
-  const handleCheckVideo = async () => {
-    if (!url.trim()) return;
-    setIsChecking(true);
-    const isRetry = videoInfo && videoInfo.status === 'ERROR';
-
-    try {
-      const response = await axios.post('/api/tasks/fetch-info', { 
-        url, force: isRetry, useProxy 
-      });
-      setVideoInfo(response.data);
-    } catch (err) {
-      const errorMessage = err.response?.data?.error || 'Ошибка при связи с сервером';
-      setVideoInfo({ status: 'ERROR', errorMessage, url });
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  const fetchPendingTasks = async () => {
-    try {
-      const res = await axios.get('/api/tasks/available');
-      setPendingTasks(res.data);
-    } catch (err) { console.error(err); }
-  };
-
-  const handleDeleteTask = async (id) => {
-    if (!confirm("Удалить задачу из ленты креаторов?")) return;
-    try {
-      await axios.delete(`/api/tasks/${id}`);
-      fetchPendingTasks(); // Обновляем список
-      // Также можно вызвать handleCheckVideo(), чтобы обновить кружочки на каналах
-    } catch (err) { alert("Ошибка при удалении"); }
-  };
-
-  const handleSubmit = async () => {
-    if (!videoInfo || videoInfo.status !== 'READY') return;
-    if (selectedChannels.length === 0) return alert("Выберите хотя бы один канал!");
-
-    const hasDuplicates = selectedChannels.some(id => videoInfo.existingChannelIds?.includes(id));
-    
-    if (hasDuplicates) {
-      const confirmDouble = window.confirm("Это видео уже добавлялось на некоторые из выбранных каналов. Всё равно создать задачи?");
-      if (!confirmDouble) return;
-    }
-
-    try {
-      // ИСПРАВЛЕНО: передаем правильное значение приоритета
-      await axios.post('/api/tasks', {
-        originalVideoId: videoInfo.id,
-        channelIds: selectedChannels,
-        priority: isUrgent ? 'urgent' : 'normal' 
-      });
-      
-      setStatus('success');
-      fetchPendingTasks();
-      setUrl('');
-      setVideoInfo(null);
-      setSelectedChannels([]);
-      setIsUrgent(false);
-      setTimeout(() => setStatus('idle'), 3000);
-    } catch (error) { 
-      console.error(error);
-      alert("Ошибка при создании задач"); 
-    }
-  };
-
-  const formatDuration = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  // Если страница еще грузит каналы или упала с ошибкой
+  if (loading || error) {
+    return <PageStatus loading={loading} error={error} onRetry={initPage} />;
+  }
 
   return (
-    <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter']">
-      
-      <header className="pt-10 mb-8 animate-in fade-in duration-700">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Zap size={20} className="text-white" fill="currentColor" />
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">Добавить видео</h1>
-        </div>
-        <p className="text-sm md:text-base text-slate-500 font-medium">Система подготовит Shorts для вашей команды.</p>
+    <div className="max-w-4xl mx-auto pb-24 px-4 font-['Inter']">
+      <header className="pt-10 mb-8 px-1 animate-in fade-in duration-700">
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight text-left">
+          Добавить контент
+        </h1>
+        <p className="text-sm md:text-base text-slate-500 font-medium mt-2">
+          Вставьте ссылку на видео, чтобы поставить задачу в очередь креаторам.
+        </p>
       </header>
 
       <div className="space-y-5">
