@@ -96,14 +96,14 @@ module.exports = (io) => {
         return prisma.task.create({
           data: {
             originalVideoId: parseInt(originalVideoId),
-            channelId: parseInt(t.channelId), // берем из t
+            channelId: parseInt(t.channelId),
             managerId: req.user.id,
             priority: 'normal',
-            creatorId: t.creatorId ? parseInt(t.creatorId) : null, // берем из t
+            creatorId: t.creatorId ? parseInt(t.creatorId) : null,
             status: t.creatorId ? 'IN_PROGRESS' : 'AWAITING_REACTION',
             claimedAt: t.creatorId ? new Date() : null,
-            deadline: t.deadline ? new Date(t.deadline) : null, // берем из t
-            scheduledAt: t.scheduledAt ? new Date(t.scheduledAt) : null, // берем из t
+            deadline: t.deadline ? new Date(t.deadline) : null,
+            scheduledAt: t.scheduledAt ? new Date(t.scheduledAt) : null,
           },
           include: { channel: true, creator: true, originalVideo: true }
         });

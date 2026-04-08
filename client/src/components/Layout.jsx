@@ -17,7 +17,7 @@ export default function Layout({ onLogout, user }) {
       const registration = await navigator.serviceWorker.register('/sw.js');
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: 'BIp0B0BFzhcZjiw5P7WOAKIEXD_WzCfEXIJjwXPHBW6AHyV-Er-NVBd1KLMfP3B1QTB2stt6Z1lVdhXGtHelm6M'
+        applicationServerKey: 'BJOKOTJYP_yKaTE_y1PT5LJ5xIOhNu1pDe4SQxZpYKuBsSVNspTDSGOUFjoPpeVG1z-Diz2SnbXb7BSsjiudkNs'
       });
 
       await axios.post('/api/auth/subscribe', subscription);
