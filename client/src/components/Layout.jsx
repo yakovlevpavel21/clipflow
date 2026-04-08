@@ -1,5 +1,6 @@
 // client/src/components/Layout.jsx
 import { useState, useEffect } from 'react';
+import axios from '../api';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Upload, Settings, 
