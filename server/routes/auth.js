@@ -24,15 +24,35 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/subscribe', protect, async (req, res) => {
-  const { endpoint, keys } = req.body;
+  const sub = req.body; // Это весь объект подписки
+
+  // Лог для проверки: видишь ли ты данные в терминале сервера?
+  console.log("Получена подписка от юзера:", req.user.id, sub);
+
+  if (!sub.endpoint || !sub.keys) {
+    return res.status(400).json({ error: "Неверный формат подписки" });
+  }
+
   try {
     await prisma.pushSubscription.upsert({
-      where: { endpoint },
-      update: { userId: req.user.id, p256dh: keys.p256dh, auth: keys.auth },
-      create: { endpoint, p256dh: keys.p256dh, auth: keys.auth, userId: req.user.id }
+      where: { endpoint: sub.endpoint },
+      update: { 
+        userId: req.user.id, 
+        p256dh: sub.keys.p256dh, 
+        auth: sub.keys.auth 
+      },
+      create: { 
+        endpoint: sub.endpoint, 
+        p256dh: sub.keys.p256dh, 
+        auth: sub.keys.auth, 
+        userId: req.user.id 
+      }
     });
     res.status(201).json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    console.error("Ошибка сохранения подписки в БД:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

@@ -13,17 +13,53 @@ export default function Layout({ onLogout, user }) {
   const location = useLocation();
 
   const subscribeToPush = async () => {
-    if ('serviceWorker' in navigator) {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: 'BJOKOTJYP_yKaTE_y1PT5LJ5xIOhNu1pDe4SQxZpYKuBsSVNspTDSGOUFjoPpeVG1z-Diz2SnbXb7BSsjiudkNs'
-      });
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn("Пуши не поддерживаются этим браузером");
+      return;
+    }
 
+    try {
+      // 1. Регистрируем воркер
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      console.log("Service Worker зарегистрирован");
+
+      // 2. Ждем готовности
+      await navigator.serviceWorker.ready;
+
+      // 3. Подписываемся
+      const subscribeOptions = {
+        userVisibleOnly: true,
+        // ВАЖНО: конвертируем ключ здесь!
+        applicationServerKey: urlBase64ToUint8Array('ТВОЙ_ПУБЛИЧНЫЙ_VAPID_КЛЮЧ_ИЗ_ENV')
+      };
+
+      const subscription = await registration.pushManager.subscribe(subscribeOptions);
+      console.log("Браузер выдал подписку:", subscription);
+
+      // 4. Отправляем на сервер
+      // Важно: объект subscription нужно передать целиком или вытащить ключи
       await axios.post('/api/auth/subscribe', subscription);
-      console.log("Пуши настроены!");
+      console.log("Подписка успешно сохранена в БД!");
+
+    } catch (err) {
+      console.error("Ошибка при настройке пушей:", err);
     }
   };
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
 
   useEffect(() => {
     if (user) subscribeToPush();

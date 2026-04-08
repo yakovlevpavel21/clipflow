@@ -20,11 +20,13 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 }
 
 const sendPushNotification = async (userId, payload) => {
-  if (!process.env.VAPID_PUBLIC_KEY) return;
-
+  console.log(`[Push] Пытаюсь отправить уведомление пользователю ${userId}`);
+  
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId: parseInt(userId) }
   });
+
+  console.log(`[Push] Найдено подписок для юзера: ${subscriptions.length}`);
 
   const notifications = subscriptions.map(sub => {
     const pushConfig = {
@@ -33,12 +35,12 @@ const sendPushNotification = async (userId, payload) => {
     };
 
     return webpush.sendNotification(pushConfig, JSON.stringify(payload))
+      .then(() => console.log(`[Push] Успешно отправлено на ${sub.endpoint.slice(0, 30)}...`))
       .catch(err => {
+        console.error("[Push] Ошибка при отправке конкретному устройству:", err.message);
         if (err.statusCode === 410) {
-          // Если подписка протухла — удаляем из базы
           return prisma.pushSubscription.delete({ where: { id: sub.id } });
         }
-        console.error("Ошибка пуша:", err.message);
       });
   });
 
