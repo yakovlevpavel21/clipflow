@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 
 export function useTheme() {
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+  // Устанавливаем начальное состояние из localStorage или дефолт 'dark'
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'dark';
+  });
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -9,17 +12,15 @@ export function useTheme() {
 
     if (theme === 'dark') {
       root.classList.add('dark');
-      // Цвет твоей темной панели (например, #1a1f2e)
       metaThemeColor?.setAttribute('content', '#1a1f2e'); 
     } else {
       root.classList.remove('dark');
-      // Цвет твоей светлой панели (например, #ffffff)
       metaThemeColor?.setAttribute('content', '#ffffff');
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+  const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
 
   return { theme, toggleTheme };
 }

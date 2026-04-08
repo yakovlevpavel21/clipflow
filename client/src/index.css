@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply antialiased transition-colors duration-200;
+    @apply antialiased transition-colors duration-200 bg-slate-50 dark:bg-[#0a0f1c] text-slate-900 dark:text-slate-100;
   }
 }
 

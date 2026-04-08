@@ -25,6 +25,19 @@
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Clipsio</title>
+    <script>
+      // Мгновенная проверка темы до загрузки React
+      (function() {
+        const theme = localStorage.getItem('theme') || 'dark'; // Темная по умолчанию
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+        // Устанавливаем цвет фона body сразу, чтобы не было белого мерцания
+        document.styleSheets[0].insertRule(`body { background-color: ${theme === 'dark' ? '#0a0f1c' : '#f8fafc'}; }`, 0);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
