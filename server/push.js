@@ -31,12 +31,11 @@ const sendPushNotification = async (userId, payload) => {
 
       return webpush.sendNotification(pushConfig, JSON.stringify(payload))
         .catch(async (err) => {
-          // Если подписка недействительна (код 410 или 404), удаляем её
+          console.error(`[Push Error] Устройство: ${sub.id} | Код: ${err.statusCode} | Сообщение: ${err.message}`);
+          
           if (err.statusCode === 410 || err.statusCode === 404) {
             console.log(`[Push] Удаление неактивной подписки: ${sub.id}`);
             await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
-          } else {
-            console.error(`[Push] Ошибка устройства ${sub.id}:`, err.message);
           }
         });
     });

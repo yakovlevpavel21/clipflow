@@ -85,14 +85,16 @@ module.exports = (io) => {
 
   // --- СОЗДАНИЕ ЗАДАЧ (BULK) ---
   router.post('/bulk', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
+    // Вытаскиваем массив tasks из тела запроса
     const { originalVideoId, tasks } = req.body;
 
     if (!originalVideoId || !tasks || !Array.isArray(tasks)) {
-      return res.status(400).json({ error: "Неверные данные запроса" });
+      return res.status(400).json({ error: "Некорректные данные (отсутствует ID видео или массив задач)" });
     }
 
     try {
       const createdTasks = await Promise.all(tasks.map(async (t) => {
+        // ПРОВЕРКА: каждое поле берется из объекта 't' (текущий элемент цикла)
         return prisma.task.create({
           data: {
             originalVideoId: parseInt(originalVideoId),
@@ -102,43 +104,30 @@ module.exports = (io) => {
             creatorId: t.creatorId ? parseInt(t.creatorId) : null,
             status: t.creatorId ? 'IN_PROGRESS' : 'AWAITING_REACTION',
             claimedAt: t.creatorId ? new Date() : null,
+            // Исправляем здесь:
             deadline: t.deadline ? new Date(t.deadline) : null,
             scheduledAt: t.scheduledAt ? new Date(t.scheduledAt) : null,
           },
           include: { channel: true, creator: true, originalVideo: true }
         });
       }));
-      
-      const assignedCreators = [...new Set(createdTasks.filter(t => t.creatorId).map(t => t.creatorId))];
-      const toFeedCount = createdTasks.filter(t => !t.creatorId).length;
-      
-      assignedCreators.forEach(cId => {
-        sendPushNotification(cId, {
-          title: "Новое задание 🎬",
-          message: "Менеджер назначил вам новые видео. Проверьте вкладку 'В процессе'.",
-          url: "/creator"
-        });
+
+      // Отправка Push-уведомлений (без await, чтобы не тормозить ответ)
+      const { sendPushNotification } = require('../push');
+      createdTasks.forEach(task => {
+        if (task.creatorId) {
+          sendPushNotification(task.creatorId, {
+            title: "Новое задание!",
+            message: `Для канала ${task.channel.name}`,
+            url: "/creator"
+          }).catch(e => console.log("[Push Log] Не удалось отправить пуш"));
+        }
       });
 
-      if (toFeedCount > 0) {
-        prisma.user.findMany({ where: { role: 'CREATOR' }, select: { id: true } })
-          .then(allCreators => {
-            allCreators.forEach(c => {
-              // Не шлем тем, кто уже получил персональный пуш выше
-              if (!assignedCreators.includes(c.id)) {
-                sendPushNotification(c.id, {
-                  title: "Задания в ленте! 🔥",
-                  message: `В ленту Clipsio добавлено ${toFeedCount} новых видео.`,
-                  url: "/creator"
-                });
-              }
-            });
-          });
-      }
       res.json({ success: true, count: createdTasks.length });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: err.message });
+      console.error("Критическая ошибка /tasks/bulk:", err);
+      res.status(500).json({ error: "Ошибка сервера при создании задач" });
     }
   });
 
