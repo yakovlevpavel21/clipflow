@@ -1,6 +1,6 @@
 // client/src/pages/Dashboard.jsx
 import { useEffect, useState } from 'react';
-import axios, { socket } from '../api'; // Импортируем сокет для real-time
+import api, { socket } from '../api'; // Импортируем сокет для real-time
 import { 
   CheckCircle2, Clock, Send, Layers, ArrowUpRight, PlayCircle, Activity, Zap, Users, Loader2, Video
 } from 'lucide-react';

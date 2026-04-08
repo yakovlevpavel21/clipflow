@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import axios, { socket } from '../api'; 
+import api, { socket } from '../api'; 
 import { Shield, Loader2 } from 'lucide-react';
 
 // Импорт компонентов (убедись, что файлы созданы в папке components)

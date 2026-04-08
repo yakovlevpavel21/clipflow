@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios, { socket } from '../api';
+import api, { socket } from '../api';
 import { 
   X, Sparkles, Clock, AlertCircle, CheckCircle2, 
   Loader2, LayoutGrid, Play, Zap, Globe, User, Calendar, Copy

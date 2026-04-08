@@ -1,6 +1,6 @@
 // client/src/pages/ManagerPage.jsx
 import { useState, useEffect, useRef, useMemo } from 'react';
-import axios, { socket } from '../api';
+import api, { socket } from '../api';
 import { 
   Plus, List, Calendar, X, Loader2, CheckCircle2, 
   Clock, Send, Zap, Filter, Sparkles, Search 
