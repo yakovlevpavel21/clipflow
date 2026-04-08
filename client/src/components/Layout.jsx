@@ -95,7 +95,8 @@ export default function Layout({ onLogout, user }) {
 
       {/* --- SIDEBAR --- */}
       <aside className={`
-        fixed lg:sticky top-0 left-0 z-[60] w-72 h-screen 
+        fixed lg:sticky top-0 left-0 z-[110] /* Подняли z-index выше шапки (100) */
+        w-72 h-screen 
         bg-white dark:bg-[#1a1f2e] border-r border-slate-200 dark:border-slate-800 
         transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
         lg:translate-x-0 transition-transform duration-300 ease-in-out

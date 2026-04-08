@@ -8,6 +8,25 @@
   }
 }
 
+html, body {
+  /* Запрещаем свайпы назад/вперед в браузере */
+  overscroll-behavior-x: none; 
+  /* Убираем прыжки фона (оставляем только вертикальный скролл) */
+  overscroll-behavior-y: contain;
+  /* Принудительно задаем фон, чтобы он не был белым при "оттяжке" страницы */
+  @apply bg-slate-50 dark:bg-[#0a0f1c];
+  height: 100%;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Фикс для мобильного Safari, чтобы контент не "плавал" под пальцем */
+.no-swipe {
+  touch-action: pan-y;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
