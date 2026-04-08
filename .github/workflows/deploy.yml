@@ -29,4 +29,11 @@ jobs:
             cd ../client
             npm install
             npm run build
-            # Копируем билд фронтенда в папку, которую раздает Nginx (если нужно)
+            
+            # Очищаем папку, которую раздает Nginx
+            sudo rm -rf /var/www/clipsio/*
+            # Копируем свежий билд из папки проекта в папку Nginx
+            sudo cp -r dist/* /var/www/clipsio/
+            
+            # (Опционально) Перезапускаем Nginx, чтобы сбросить кеш
+            sudo systemctl restart nginx
