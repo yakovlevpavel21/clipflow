@@ -100,16 +100,12 @@ export default function Layout({ onLogout, user }) {
 
       {/* --- SIDEBAR --- */}
       <aside className={`
-        fixed lg:sticky top-0 left-0 z-[110] w-72 h-screen 
+        fixed lg:sticky top-0 left-0 z-[110] /* Подняли z-index выше шапки (100) */
+        w-72 h-screen 
         bg-white dark:bg-[#1a1f2e] border-r border-slate-200 dark:border-slate-800 
-        transform transition-transform duration-300 ease-in-out
+        transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
+        lg:translate-x-0 transition-transform duration-300 ease-in-out
         flex flex-col
-        
-        /* ИСПРАВЛЕНИЕ: */
-        ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
-        
-        /* На мобилках: если меню закрыто, делаем его полностью невидимым для браузера */
-        ${!isMenuOpen ? 'max-lg:invisible' : 'max-lg:visible'}
       `}>
         <div className="p-6 flex flex-col h-full w-full">
           
