@@ -184,18 +184,22 @@ module.exports = (io) => {
   });
 
   // --- ДЕЙСТВИЯ С ЗАДАЧАМИ ---
+  router.get('/download-file', async (req, res) => {
+    const { path: filePath, token } = req.query;
 
-  router.get('/download-file', protect, (req, res) => {
-    const filePath = req.query.path; // получаем путь из параметров
-    if (!filePath) return res.status(400).send("Path is required");
+    try {
+      // Проверяем токен вручную
+      const jwt = require('jsonwebtoken');
+      jwt.verify(token, process.env.JWT_SECRET);
 
-    const fullPath = path.join(__dirname, '../../', filePath);
-    
-    if (fs.existsSync(fullPath)) {
-      // res.download принудительно заставляет браузер именно СКАЧИВАТЬ файл
-      res.download(fullPath); 
-    } else {
-      res.status(404).send("File not found");
+      const fullPath = path.join(__dirname, '../../', filePath);
+      if (fs.existsSync(fullPath)) {
+        res.download(fullPath);
+      } else {
+        res.status(404).send("Файл не найден");
+      }
+    } catch (err) {
+      res.status(401).send("Не авторизован");
     }
   });
 

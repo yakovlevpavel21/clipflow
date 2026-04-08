@@ -19,4 +19,9 @@ export const socket = io({
   path: '/socket.io',
 });
 
+export const getDownloadUrl = (filePath) => {
+  const token = localStorage.getItem('token');
+  return `/api/tasks/download-file?path=${filePath}&token=${token}`;
+};
+
 export default api;
