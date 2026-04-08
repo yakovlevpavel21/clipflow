@@ -1,7 +1,6 @@
-// client/src/components/UploadModal.jsx
 import { useState, useEffect } from 'react';
-import { X, UploadCloud, Loader2, Check, RefreshCcw, Film, PlayCircle } from 'lucide-react';
-import api from 'axios';
+import { X, UploadCloud, Loader2, Check, RefreshCcw, Film } from 'lucide-react';
+import api from '../api'; // Используем ваш настроенный инстанс
 
 export default function UploadModal({ task, onClose, onSuccess }) {
   const [dragActive, setDragActive] = useState(false);
@@ -9,7 +8,6 @@ export default function UploadModal({ task, onClose, onSuccess }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
 
-  // Ссылка на оригинальный файл на сервере
   const originalVideoUrl = `/${task.originalVideo?.filePath}`;
 
   useEffect(() => {
@@ -20,8 +18,25 @@ export default function UploadModal({ task, onClose, onSuccess }) {
     };
   }, [previewUrl]);
 
+  // ВАЛИДАЦИЯ ФАЙЛА (ФОРМАТ + РАЗМЕР)
   const handleFile = (file) => {
-    if (!file || !file.type.startsWith('video/')) return alert("Нужен видеофайл!");
+    if (!file) return;
+
+    // 1. Проверка формата
+    const allowedExtensions = ['.mp4', '.mov', '.avi'];
+    const isAllowedFormat = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    
+    // 2. Проверка размера (50 МБ)
+    const maxSizeInBytes = 50 * 1024 * 1024;
+
+    if (!isAllowedFormat) {
+      return alert("Ошибка: Допустимы только форматы MP4, MOV или AVI.");
+    }
+
+    if (file.size > maxSizeInBytes) {
+      return alert("Ошибка: Файл слишком большой. Максимальный размер — 50 МБ.");
+    }
+
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     setSelectedFile(file);
@@ -61,7 +76,6 @@ export default function UploadModal({ task, onClose, onSuccess }) {
       
       <div className="relative bg-white dark:bg-[#1a1f2e] w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[95vh]">
         
-        {/* Кнопка закрытия */}
         <button 
           onClick={onClose} 
           disabled={loading} 
@@ -72,7 +86,6 @@ export default function UploadModal({ task, onClose, onSuccess }) {
         
         <div className="p-6 md:p-8 space-y-6 overflow-y-auto no-scrollbar">
           
-          {/* СЕКЦИЯ: ОРИГИНАЛЬНОЕ ВИДЕО (ПЛЕЕР) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between pr-10">
                <div className="flex items-center gap-2 text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
@@ -92,12 +105,11 @@ export default function UploadModal({ task, onClose, onSuccess }) {
                 playsInline
               />
             </div>
-            <p className="text-[11px] font-medium text-slate-500 px-1 truncate">
+            <p className="text-[11px] font-medium text-slate-500 px-1 truncate italic">
               {task.originalVideo.title}
             </p>
           </div>
 
-          {/* СЕКЦИЯ: ЗАГРУЗКА ОТВЕТА */}
           <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
               {previewUrl ? "Проверьте ваш результат" : "Загрузите вашу реакцию"}
@@ -113,14 +125,21 @@ export default function UploadModal({ task, onClose, onSuccess }) {
                   ${dragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-800 hover:border-blue-500/30'}
                 `}
               >
-                <input type="file" accept="video/*" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
+                <input 
+                  type="file" 
+                  accept=".mp4,.mov,.avi,video/mp4,video/quicktime,video/x-msvideo" 
+                  className="hidden" 
+                  onChange={(e) => handleFile(e.target.files[0])} 
+                />
                 <div className="flex flex-col items-center gap-3 text-center">
                   <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-full flex items-center justify-center">
                     <UploadCloud size={20} />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Выберите файл реакции</p>
-                    <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tighter">Перетащите сюда MP4 / MOV</p>
+                    <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tighter">
+                      MP4 / MOV / AVI (макс. 50 МБ)
+                    </p>
                   </div>
                 </div>
               </label>
@@ -159,7 +178,6 @@ export default function UploadModal({ task, onClose, onSuccess }) {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </div>
