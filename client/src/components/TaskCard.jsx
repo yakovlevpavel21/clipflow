@@ -2,7 +2,8 @@
 import { memo } from 'react';
 import { 
   Download, Play, Clock, UserCheck, Undo2, 
-  FileVideo, Eye, ExternalLink, RotateCcw, AlertCircle, Youtube 
+  FileVideo, Eye, ExternalLink, RotateCcw, AlertCircle, 
+  PlayCircle
 } from 'lucide-react';
 
 const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCancelUpload }) => {
@@ -200,7 +201,7 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
                     onClick={(e) => { e.stopPropagation(); window.open(task.youtubeUrl, '_blank', 'noopener,noreferrer'); }} 
                     className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg border border-red-100 dark:border-red-800 hover:bg-red-600 hover:text-white transition-all ml-2"
                   >
-                    <Youtube size={16} />
+                    <PlayCircle size={16} />
                   </button>
                 )}
               </div>
