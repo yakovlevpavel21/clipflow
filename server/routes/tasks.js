@@ -200,55 +200,18 @@ module.exports = (io) => {
 
     try {
       const jwt = require('jsonwebtoken');
-      const pathModule = require('path');
-      const fs = require('fs');
-
       jwt.verify(token, process.env.JWT_SECRET);
+      const fullPath = path.resolve(process.cwd(), filePath);
 
-      const fullPath = pathModule.resolve(process.cwd(), filePath);
-
-      if (!fs.existsSync(fullPath)) {
-        return res.status(404).send("File not found");
-      }
-
-      const stat = fs.statSync(fullPath);
-      const fileSize = stat.size;
-      const range = req.headers.range;
-
-      const downloadName = name ? String(name) : 'video.mp4';
-
-      // 🔥 КЛЮЧЕВОЕ
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${encodeURIComponent(downloadName)}"`
-      );
-
-      res.setHeader('Content-Type', 'video/mp4');
-      res.setHeader('Accept-Ranges', 'bytes');
-
-      if (range) {
-        const parts = range.replace(/bytes=/, "").split("-");
-        const start = parseInt(parts[0], 10);
-        const end = parts[1]
-          ? parseInt(parts[1], 10)
-          : fileSize - 1;
-
-        const chunkSize = end - start + 1;
-
-        const file = fs.createReadStream(fullPath, { start, end });
-
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Content-Length': chunkSize,
-        });
-
-        file.pipe(res);
-      } else {
-        res.writeHead(200, {
-          'Content-Length': fileSize,
-        });
+      if (fs.existsSync(fullPath)) {
+        res.setHeader('Access-Control-Allow-Origin', '*'); // Разрешаем fetch
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(name || 'video.mp4')}"`);
+        res.setHeader('Content-Length', fs.statSync(fullPath).size);
 
         fs.createReadStream(fullPath).pipe(res);
+      } else {
+        res.status(404).send("Not found");
       }
     } catch (err) {
       res.status(401).send("Unauthorized");

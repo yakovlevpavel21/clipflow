@@ -1,8 +1,15 @@
-import { memo } from 'react';
-import { Download, Play, Clock, Undo2, FileVideo, AlertCircle, PlayCircle } from 'lucide-react';
+import { memo, useState } from 'react';
+import { 
+  Download, Play, Clock, Undo2, FileVideo, 
+  AlertCircle, PlayCircle, Loader2, CheckCircle2, X 
+} from 'lucide-react';
 import { getDownloadUrl } from '../api';
 
 const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCancelUpload }) => {
+  // Состояния для "умного" скачивания на iOS
+  const [prepStatus, setPrepStatus] = useState('idle'); // idle, loading, ready
+  const [fileObject, setFileObject] = useState(null);
+
   const thumbUrl = `/${task.originalVideo?.thumbnailPath}`;
   const isHistory = mode === 'history';
   const isMy = mode === 'my';
@@ -28,34 +35,55 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
 
   const deadline = formatDeadline(task.deadline);
 
-  // ХЕНДЛЕР ДЛЯ ОТКРЫТИЯ ПЛЕЕРА С КНОПКАМИ ВЫХОДА (DONE + SAFARI ICON)
-  const handleDownload = (e) => {
+  // ФУНКЦИЯ СКАЧИВАНИЯ (ДЛЯ iOS PWA И ПК)
+  const handleDownload = async (e) => {
     e.stopPropagation();
 
-    const videoFileName = `${task.originalVideo?.videoId || 'video'}.mp4`;
-    const url =
-      window.location.origin +
-      getDownloadUrl(task.originalVideo?.filePath, videoFileName);
-
-    const isPWA =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone;
-
-    if (isPWA) {
-      // ❗️ КЛЮЧ: открываем через _blank
-      // Это создаёт WebSheet с кнопкой "Done"
-      window.open(url, '_blank');
-
+    // Если файл уже готов в памяти — вызываем Share Sheet (меню поделиться)
+    if (prepStatus === 'ready' && fileObject) {
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            files: [fileObject],
+            title: fileObject.name,
+          });
+          setPrepStatus('idle');
+          setFileObject(null);
+        }
+      } catch (err) {
+        console.log("User cancelled or share failed");
+      }
       return;
     }
 
-    // обычный браузер
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = videoFileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const videoFileName = `${task.originalVideo?.videoId || 'video'}.mp4`;
+    const url = window.location.origin + getDownloadUrl(task.originalVideo?.filePath, videoFileName);
+
+    // Если это iOS PWA
+    const isPWA = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+
+    if (isPWA) {
+      setPrepStatus('loading');
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        // Важно: тип video/mp4 дает кнопку "Сохранить видео" в меню iOS
+        const file = new File([blob], videoFileName, { type: 'video/mp4' });
+        setFileObject(file);
+        setPrepStatus('ready');
+      } catch (err) {
+        alert("Ошибка подготовки файла");
+        setPrepStatus('idle');
+      }
+    } else {
+      // Обычный браузер (ПК / Android)
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = videoFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const getBorderStyle = () => {
@@ -71,9 +99,11 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
       <div className="relative w-full md:w-48 aspect-video rounded-xl overflow-hidden bg-black shrink-0 shadow-sm group/img border dark:border-white/5">
         <img src={thumbUrl} className="absolute inset-0 w-full h-full object-cover opacity-50" alt="" />
         <img src={thumbUrl} className="absolute inset-0 w-full h-full object-contain z-10" />
+        
         <div className="absolute bottom-2 right-2 z-20 bg-black/70 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] font-bold text-white tabular-nums border border-white/10">
           {formatDuration(task.originalVideo?.duration)}
         </div>
+
         <div 
           onClick={(e) => { 
             e.stopPropagation(); 
@@ -94,9 +124,11 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
              <span className="text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 tracking-wide">
                {task.channel?.name || 'Без канала'}
              </span>
+
              {deadline && !isHistory && (
                <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${deadline.isOverdue ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500'}`}>
-                 <Clock size={12} /> <span className="tabular-nums uppercase">{deadline.text}</span>
+                 <Clock size={12} />
+                 <span className="tabular-nums uppercase">{deadline.text}</span>
                </div>
              )}
           </div>
@@ -109,28 +141,66 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
           {task.originalVideo?.title}
         </h3>
 
+        {/* ПРИЧИНА ОТКЛОНЕНИЯ */}
         {task.needsFixing && isMy && (
-          <div className="mb-3 p-2.5 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50 flex gap-2 items-start animate-pulse">
+          <div className="mb-3 p-2.5 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50 flex gap-2 items-start">
             <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
-            <p className="text-[11px] text-red-800 dark:text-red-300 italic leading-snug">{task.rejectionReason || "Причина не указана"}</p>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase leading-none mb-1">Нужны правки:</span>
+              <p className="text-[11px] text-red-800 dark:text-red-300 italic leading-snug">
+                {task.rejectionReason || "Причина не указана"}
+              </p>
+            </div>
           </div>
         )}
 
-        {/* КНОПКИ УПРАВЛЕНИЯ */}
+        {/* КНОПКИ ДЕЙСТВИЙ */}
         <div className="flex flex-wrap items-center gap-2 mt-auto pt-2">
           
           {/* СВОБОДНЫЕ */}
           {isAvailable && (
-            <button onClick={(e) => { e.stopPropagation(); onClaim(); }} className="w-full md:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-xl text-[11px] font-bold uppercase active:scale-95 transition-all shadow-md">Взять в работу</button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onClaim(); }} 
+              className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl text-[11px] font-bold uppercase active:scale-95 transition-all shadow-md shadow-blue-500/20"
+            >
+              Взять в работу
+            </button>
           )}
 
           {/* В ПРОЦЕССЕ */}
           {isMy && (
             <div className="flex items-center gap-2 w-full">
-              <button onClick={(e) => { e.stopPropagation(); onUpload(); }} className="flex-1 md:flex-none md:min-w-[140px] bg-blue-600 text-white px-4 py-2.5 rounded-xl text-[11px] font-bold uppercase active:scale-95 transition-all shadow-md">{task.needsFixing ? "Заменить" : "Загрузить ответ"}</button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onUpload(); }} 
+                className="flex-1 md:flex-none md:min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-[11px] font-bold uppercase active:scale-95 transition-all shadow-md shadow-blue-500/10"
+              >
+                {task.needsFixing ? "Заменить файл" : "Загрузить ответ"}
+              </button>
+              
               <div className="flex items-center gap-1.5 ml-auto md:ml-0">
-                <button onClick={handleDownload} title="Скачать" className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl border dark:border-slate-700 shadow-sm"><Download size={18}/></button>
-                <button onClick={(e) => { e.stopPropagation(); onAbandon(); }} className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 transition-colors rounded-xl border dark:border-slate-800"><Undo2 size={18}/></button>
+                <button 
+                  onClick={handleDownload}
+                  disabled={prepStatus === 'loading'}
+                  className={`p-2.5 rounded-xl border transition-all flex items-center gap-2 min-w-[42px] ${
+                    prepStatus === 'ready' ? 'bg-green-500 text-white border-green-600 shadow-md animate-pulse' : 
+                    prepStatus === 'loading' ? 'bg-blue-50 text-blue-600' : 
+                    'bg-slate-100 dark:bg-slate-800 text-slate-500 border-transparent dark:border-slate-700 shadow-sm hover:text-blue-600'
+                  }`}
+                >
+                  {prepStatus === 'loading' ? <Loader2 size={18} className="animate-spin" /> : 
+                   prepStatus === 'ready' ? <CheckCircle2 size={18} /> : 
+                   <Download size={18}/>}
+                  
+                  {prepStatus === 'ready' && <span className="text-[10px] font-bold uppercase">Сохранить</span>}
+                </button>
+
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onAbandon(); }} 
+                  title="Отказаться"
+                  className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 transition-colors rounded-xl border dark:border-slate-800"
+                >
+                  <Undo2 size={18}/>
+                </button>
               </div>
             </div>
           )}
@@ -138,12 +208,22 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
           {/* ИСТОРИЯ */}
           {isHistory && (
             <div className="flex items-center gap-2 w-full">
-              <button onClick={(e) => { e.stopPropagation(); onPreview(task, 'reaction'); }} className="flex-1 md:flex-none bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border dark:border-slate-700">Мой ответ</button>
-              <button onClick={(e) => { e.stopPropagation(); onPreview(task, 'original'); }} className="flex-1 md:flex-none bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border dark:border-slate-700">Оригинал</button>
+              <button onClick={(e) => { e.stopPropagation(); onPreview(task, 'reaction'); }} className="flex-1 md:flex-none bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border dark:border-slate-700 shadow-sm">Мой ответ</button>
+              <button onClick={(e) => { e.stopPropagation(); onPreview(task, 'original'); }} className="flex-1 md:flex-none bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border dark:border-slate-700 shadow-sm">Оригинал</button>
+              
               <div className="flex items-center gap-1.5 ml-auto">
-                {/* В истории тоже добавляем кнопку скачивания/просмотра */}
-                <button onClick={handleDownload} className="p-2 text-slate-400 hover:text-blue-500"><Download size={18}/></button>
-                {isPending && <button onClick={(e) => { e.stopPropagation(); onCancelUpload(task.id); }} className="text-red-500 font-bold text-[10px] uppercase px-2">Отозвать</button>}
+                <button 
+                  onClick={handleDownload}
+                  disabled={prepStatus === 'loading'}
+                  className={`p-2 transition-colors ${prepStatus === 'ready' ? 'text-green-500' : 'text-slate-400 hover:text-blue-500'}`}
+                >
+                   {prepStatus === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Download size={18}/>}
+                </button>
+
+                {isPending && (
+                  <button onClick={(e) => { e.stopPropagation(); onCancelUpload(task.id); }} className="text-red-500 font-bold text-[10px] uppercase px-2 hover:underline">Отозвать</button>
+                )}
+                
                 {task.status === 'PUBLISHED' && task.youtubeUrl && (
                   <button onClick={(e) => { e.stopPropagation(); window.open(task.youtubeUrl, '_blank'); }} className="p-2 bg-red-500 text-white rounded-xl active:scale-90 transition-all shadow-lg shadow-red-500/20"><PlayCircle size={18}/></button>
                 )}

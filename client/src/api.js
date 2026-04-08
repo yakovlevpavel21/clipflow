@@ -21,14 +21,19 @@ export const socket = io({
 
 export const getDownloadUrl = (filePath, fileName) => {
   const token = localStorage.getItem('token');
-
   const params = new URLSearchParams({
     path: filePath,
     token: token || '',
     name: fileName || 'video.mp4'
   });
-
   return `/api/tasks/download-file?${params.toString()}`;
+};
+
+// Функция для скачивания файла как Blob
+export const fetchFileAsBlob = async (url) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Ошибка загрузки');
+  return await response.blob();
 };
 
 export default api;
