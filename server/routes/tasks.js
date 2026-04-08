@@ -109,30 +109,31 @@ module.exports = (io) => {
         });
       }));
       
-      // 1. Уведомляем тех, кому назначили задачу персонально
-      const assignedTasks = createdTasks.filter(t => t.creatorId);
+      const assignedCreators = [...new Set(createdTasks.filter(t => t.creatorId).map(t => t.creatorId))];
+      const toFeedCount = createdTasks.filter(t => !t.creatorId).length;
       
-      for (const task of assignedTasks) {
-        await sendPushNotification(task.creatorId, {
-          title: "Персональное задание!",
-          message: `Вам назначено видео на канале ${task.channel.name}`,
+      assignedCreators.forEach(cId => {
+        sendPushNotification(cId, {
+          title: "Новое задание 🎬",
+          message: "Менеджер назначил вам новые видео. Проверьте вкладку 'В процессе'.",
           url: "/creator"
         });
-      }
+      });
 
-      // 2. Если есть задачи в общую ленту — уведомляем ВСЕХ креаторов
-      const toFeedCount = createdTasks.filter(t => !t.creatorId).length;
       if (toFeedCount > 0) {
-        const allCreators = await prisma.user.findMany({ where: { role: 'CREATOR' } });
-        
-        const pushPromises = allCreators.map(creator => 
-          sendPushNotification(creator.id, {
-            title: "Новые задачи в ленте!",
-            message: `В ленту Clipsio добавлено ${toFeedCount} видео.`,
-            url: "/creator"
-          })
-        );
-        await Promise.all(pushPromises);
+        prisma.user.findMany({ where: { role: 'CREATOR' }, select: { id: true } })
+          .then(allCreators => {
+            allCreators.forEach(c => {
+              // Не шлем тем, кто уже получил персональный пуш выше
+              if (!assignedCreators.includes(c.id)) {
+                sendPushNotification(c.id, {
+                  title: "Задания в ленте! 🔥",
+                  message: `В ленту Clipsio добавлено ${toFeedCount} новых видео.`,
+                  url: "/creator"
+                });
+              }
+            });
+          });
       }
       res.json({ success: true, count: createdTasks.length });
     } catch (err) {
@@ -209,11 +210,19 @@ module.exports = (io) => {
         data: { status: 'REACTION_UPLOADED', reactionFilePath: req.file.path.replace(/\\/g, '/'), reactionUploadedAt: new Date(), needsFixing: false },
         include: { channel: true }
       });
-      const managers = await prisma.user.findMany({ where: { role: 'MANAGER', NOT: { tgUsername: null } } });
-      const mTags = managers.map(m => `@${m.tgUsername}`).join(' ');
-      let msg = `🎬 <b>Реакция готова!</b>\nКреатор <b>${req.user.username}</b> загрузил видео для <b>${updatedTask.channel.name}</b>.`;
-      if (mTags) msg += `\n\n${mTags} — проверьте очередь!`;
-      sendToGroup(msg).catch(() => { });
+
+      const staff = await prisma.user.findMany({ 
+        where: { role: { in: ['MANAGER', 'ADMIN'] } },
+        select: { id: true }
+      });
+
+      staff.forEach(s => {
+        sendPushNotification(s.id, {
+          title: "Реакция готова ✅",
+          message: `${req.user.username} сдал видео. Можно публиковать!`,
+          url: "/manager"
+        });
+      });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -225,8 +234,11 @@ module.exports = (io) => {
       data: { status: 'IN_PROGRESS', needsFixing: true, rejectionReason: reason },
       include: { creator: true, channel: true }
     });
-    const tag = task.creator?.tgUsername ? `@${task.creator.tgUsername}` : `Креатор ${task.creator.username}`;
-    sendToGroup(`⚠️ ${tag}, <b>нужно исправить!</b>\nКанал: <b>${task.channel.name}</b>\nПричина: <i>${reason}</i>`).catch(() => { });
+    sendPushNotification(task.creatorId, {
+      title: "Нужны правки ⚠️",
+      message: `Видео по каналу ${task.channel.name} отклонено: ${reason}`,
+      url: "/creator"
+    });
     res.json({ success: true });
   });
 
@@ -237,7 +249,11 @@ module.exports = (io) => {
       data: { status: 'PUBLISHED', youtubeUrl, scheduledAt: scheduledAt ? new Date(scheduledAt) : null, publishedAt: new Date(), uploaderId: req.user.id },
       include: { originalVideo: true }
     });
-    sendToGroup(`✅ <b>Опубликовано!</b>\n\n${youtubeUrl}`).catch(() => { });
+    sendPushNotification(task.creatorId, {
+      title: "Видео опубликовано! 🎉",
+      message: `Ваша работа по видео "${task.originalVideo.title}" уже на YouTube.`,
+      url: "/creator"
+    });
     res.json({ success: true });
   });
 
