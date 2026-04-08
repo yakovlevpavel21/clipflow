@@ -8,7 +8,20 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY
 );
 
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL || 'mailto:admin@clipsio.ru',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+  console.log("✅ Web Push инициализирован");
+} else {
+  console.log("⚠️ Web Push не настроен (пропустите это, если не используете пуши)");
+}
+
 const sendPushNotification = async (userId, payload) => {
+  if (!process.env.VAPID_PUBLIC_KEY) return;
+
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId: parseInt(userId) }
   });
