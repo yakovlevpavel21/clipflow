@@ -13,7 +13,6 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
   const isMy = mode === 'my';
   const isAvailable = mode === 'available';
 
-  // ХЕНДЛЕР СКАЧИВАНИЯ
   const handleDownload = async (e) => {
     e.stopPropagation();
     if (isDownloading) return;
@@ -21,58 +20,52 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
     const videoFileName = `${task.originalVideo?.videoId || 'video'}.mp4`;
     const url = window.location.origin + getDownloadUrl(task.originalVideo?.filePath, videoFileName);
 
-    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    const isPWA = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-    // ЛОГИКА ДЛЯ PWA НА IPHONE
-    if (isStandalone && isIOS) {
-      if (window.location.protocol !== 'https:') {
-        alert("Ошибка: Share API требует HTTPS соединения.");
-        return;
-      }
-
-      if (!navigator.share) {
-        alert("Ваш браузер не поддерживает сохранение. Откройте Clipsio в обычном Safari.");
-        return;
-      }
-
-      setIsDownloading(true);
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Файл не найден');
-        const blob = await response.blob();
-        const file = new File([blob], videoFileName, { type: 'video/mp4' });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          // КРИТИЧЕСКИЙ ФИКС БАГА "Already in progress":
-          // 1. Мгновенно выключаем лоадер
-          setIsDownloading(false);
-          
-          // 2. Вызываем Share БЕЗ await и с пустым catch.
-          // Это "отвязывает" наше приложение от зависшего системного процесса iOS.
-          navigator.share({
-            files: [file],
-            title: videoFileName,
-          }).catch((err) => {
-            // Если Share API выдает "Already in progress", мы просто игнорируем это в UI
-            console.warn("System Share interaction:", err.message);
-          });
-
-        } else {
-          throw new Error('iOS не разрешает передачу этого файла');
-        }
-      } catch (err) {
-        setIsDownloading(false);
-        alert("Ошибка: " + err.message);
-      }
-    } else {
-      // ЛОГИКА ДЛЯ ПК
+    // 1. ЛОГИКА ДЛЯ ПК И ОБЫЧНЫХ БРАУЗЕРОВ
+    if (!isPWA || !isIOS) {
       const link = document.createElement('a');
       link.href = url;
       link.download = videoFileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      return;
+    }
+
+    // 2. ЛОГИКА ДЛЯ iOS PWA (SHARE API)
+    setIsDownloading(true);
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Ошибка загрузки');
+      const blob = await response.blob();
+      const file = new File([blob], videoFileName, { type: 'video/mp4' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        
+        // СБРАСЫВАЕМ ЛОАДЕР ПЕРЕД ВЫЗОВОМ
+        setIsDownloading(false);
+
+        // ИСПРАВЛЕНИЕ: Передаем ТОЛЬКО файлы, без title и text
+        // Это уберет лишний текстовый файл при сохранении
+        await navigator.share({
+          files: [file]
+        });
+
+      } else {
+        throw new Error('Система не поддерживает этот файл');
+      }
+    } catch (err) {
+      setIsDownloading(false);
+      if (err.name !== 'AbortError' && !err.message.includes('already in progress')) {
+        alert("Ошибка: " + err.message);
+      }
+      // Фоллбек если Share залагал или не сработал
+      if (err.message.includes('already in progress')) {
+         window.open(url, '_blank');
+      }
     }
   };
 
@@ -87,12 +80,8 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
     if (!date) return null;
     const d = new Date(date);
     const now = new Date();
-    return {
-      text: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isOverdue: d < now
-    };
+    return { text: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isOverdue: d < now };
   };
-
   const deadline = formatDeadline(task.deadline);
 
   const getBorderStyle = () => {
@@ -124,10 +113,11 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
         </div>
       </div>
 
+      {/* ИНФОРМАЦИЯ */}
       <div className="flex-1 flex flex-col min-w-0 py-0.5">
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="flex flex-wrap items-center gap-2">
-             <span className="text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800">
+             <span className="text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 tracking-wide">
                {task.channel?.name || 'Без канала'}
              </span>
              {deadline && !isHistory && (
@@ -165,7 +155,7 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
                 <button 
                   disabled={isDownloading}
                   onClick={handleDownload} 
-                  className={`p-2.5 rounded-xl border transition-all flex items-center justify-center min-w-[42px] ${isDownloading ? 'bg-slate-50 text-blue-600 border-blue-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-transparent dark:border-slate-700 shadow-sm'}`}
+                  className={`p-2.5 rounded-xl border transition-all flex items-center justify-center min-w-[42px] ${isDownloading ? 'bg-slate-50 text-blue-600 border-blue-200 shadow-inner' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-transparent dark:border-slate-700 shadow-sm'}`}
                 >
                   {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18}/>}
                 </button>
@@ -176,12 +166,13 @@ const TaskCard = ({ task, mode, onClaim, onAbandon, onUpload, onPreview, onCance
 
           {isHistory && (
             <div className="flex items-center gap-2 w-full">
-              <button onClick={(e) => { e.stopPropagation(); onPreview(task, 'reaction'); }} className="flex-1 md:flex-none bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border dark:border-slate-700 shadow-sm">Мой ответ</button>
-              <button onClick={(e) => { e.stopPropagation(); onPreview(task, 'original'); }} className="flex-1 md:flex-none bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border dark:border-slate-700 shadow-sm">Оригинал</button>
+              <button onClick={(e) => { e.stopPropagation(); onPreview(task, 'reaction'); }} className="flex-1 md:flex-none bg-slate-100 dark:bg-slate-800 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border">Мой ответ</button>
+              <button onClick={(e) => { e.stopPropagation(); onPreview(task, 'original'); }} className="flex-1 md:flex-none bg-slate-100 dark:bg-slate-800 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border">Оригинал</button>
               <div className="flex items-center gap-1.5 ml-auto">
                 <button disabled={isDownloading} onClick={handleDownload} className={`p-2 transition-colors ${isDownloading ? 'text-blue-600' : 'text-slate-400 hover:text-blue-500'}`}>
                   {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18}/>}
                 </button>
+                {isPending && <button onClick={(e) => { e.stopPropagation(); onCancelUpload(task.id); }} className="text-red-500 font-bold text-[10px] uppercase px-2">Отозвать</button>}
                 {task.status === 'PUBLISHED' && task.youtubeUrl && (
                   <button onClick={(e) => { e.stopPropagation(); window.open(task.youtubeUrl, '_blank'); }} className="p-2 bg-red-500 text-white rounded-xl active:scale-90 transition-all shadow-lg shadow-red-500/20"><PlayCircle size={18}/></button>
                 )}
