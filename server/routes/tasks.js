@@ -188,15 +188,20 @@ module.exports = (io) => {
     const { path: filePath, token } = req.query;
 
     try {
-      // Проверяем токен вручную
       const jwt = require('jsonwebtoken');
       jwt.verify(token, process.env.JWT_SECRET);
 
-      const fullPath = path.join(__dirname, '../../', filePath);
+      // ПОПРАВЛЕН ПУТЬ: __dirname это server/routes, выходим в server через ../
+      const path = require('path');
+      const fullPath = path.join(__dirname, '../', '../', filePath); 
+      // Если папки originals/uploads лежат в корне server, то путь выше правильный.
+      // Если они внутри server/prisma, измени путь соответственно.
+
       if (fs.existsSync(fullPath)) {
         res.download(fullPath);
       } else {
-        res.status(404).send("Файл не найден");
+        console.error("File not found at:", fullPath);
+        res.status(404).send("Файл физически не найден на диске");
       }
     } catch (err) {
       res.status(401).send("Не авторизован");

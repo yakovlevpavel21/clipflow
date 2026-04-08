@@ -203,11 +203,21 @@ export default function CreatorPage() {
                 <div className="space-y-4">
                   {groupedTasks[date].map(task => (
                     <TaskCard 
-                      key={task.id} task={task} mode={tab}
+                      key={task.id} 
+                      task={task} 
+                      mode={tab}
                       onPreview={handleOpenPreview}
                       onUpload={() => setUploadTarget(task)}
-                      onClaim={() => api.post(`/api/tasks/${task.id}/claim`).then(initPage)}
-                      onAbandon={() => confirm("Отказаться?") && api.post(`/api/tasks/${task.id}/abandon`).then(initPage)}
+                      // ИСПРАВЛЕНО: Явно вызываем функцию и ждем обновления
+                      onClaim={async () => {
+                        await axios.post(`/api/tasks/${task.id}/claim`);
+                        initPage();
+                      }}
+                      onAbandon={async () => {
+                        if (!confirm("Вернуть задачу в ленту?")) return;
+                        await axios.post(`/api/tasks/${task.id}/abandon`);
+                        initPage(); // Это обновит список и задача исчезнет из "В процессе"
+                      }}
                       onCancelUpload={handleCancelUpload}
                     />
                   ))}
