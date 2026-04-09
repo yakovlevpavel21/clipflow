@@ -84,16 +84,14 @@ module.exports = (io) => {
 
   // --- СОЗДАНИЕ ЗАДАЧ (BULK) ---
   router.post('/bulk', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
-    // Вытаскиваем массив tasks из тела запроса
     const { originalVideoId, tasks } = req.body;
 
     if (!originalVideoId || !tasks || !Array.isArray(tasks)) {
-      return res.status(400).json({ error: "Некорректные данные (отсутствует ID видео или массив задач)" });
+      return res.status(400).json({ error: "Некорректные данные" });
     }
 
     try {
       const createdTasks = await Promise.all(tasks.map(async (t) => {
-        // ПРОВЕРКА: каждое поле берется из объекта 't' (текущий элемент цикла)
         return prisma.task.create({
           data: {
             originalVideoId: parseInt(originalVideoId),
@@ -103,7 +101,6 @@ module.exports = (io) => {
             creatorId: t.creatorId ? parseInt(t.creatorId) : null,
             status: t.creatorId ? 'IN_PROGRESS' : 'AWAITING_REACTION',
             claimedAt: t.creatorId ? new Date() : null,
-            // Исправляем здесь:
             deadline: t.deadline ? new Date(t.deadline) : null,
             scheduledAt: t.scheduledAt ? new Date(t.scheduledAt) : null,
           },
@@ -111,17 +108,33 @@ module.exports = (io) => {
         });
       }));
 
-      // Отправка Push-уведомлений (без await, чтобы не тормозить ответ)
-      const { sendPushNotification } = require('../push');
-      createdTasks.forEach(task => {
+      // Обработка уведомлений для назначенных креаторов
+      for (const task of createdTasks) {
         if (task.creatorId) {
+          const title = "Новое задание! 🎬";
+          const message = `Для канала ${task.channel.name}: ${task.originalVideo.title || 'Без названия'}`;
+
+          // 1. Сохраняем в историю уведомлений БД
+          await prisma.notification.create({
+            data: {
+              userId: task.creatorId,
+              title: title,
+              message: message,
+              type: "TASK_ASSIGNED"
+            }
+          }).catch(e => console.error("History Log Error:", e));
+
+          // 2. Отправляем Push (внутри него будет проверка настроек пользователя)
           sendPushNotification(task.creatorId, {
-            title: "Новое задание!",
-            message: `Для канала ${task.channel.name}`,
+            title: title,
+            message: message,
             url: "/creator"
-          }).catch(e => console.log("[Push Log] Не удалось отправить пуш"));
+          }).catch(e => console.log("[Push Log] Ошибка отправки"));
+
+          // 3. Шлем сигнал через сокет (для красной точки на колокольчике)
+          io.to(`user_${task.creatorId}`).emit('new_notification');
         }
-      });
+      }
 
       res.json({ success: true, count: createdTasks.length });
     } catch (err) {
@@ -226,12 +239,18 @@ module.exports = (io) => {
     res.json(task);
   });
 
+  // --- ЗАГРУЗКА ОТВЕТА (CREATOR) ---
   router.post('/:id/upload', protect, upload.single('video'), async (req, res) => {
     try {
       const updatedTask = await prisma.task.update({
         where: { id: parseInt(req.params.id) },
-        data: { status: 'REACTION_UPLOADED', reactionFilePath: req.file.path.replace(/\\/g, '/'), reactionUploadedAt: new Date(), needsFixing: false },
-        include: { channel: true }
+        data: { 
+          status: 'REACTION_UPLOADED', 
+          reactionFilePath: req.file.path.replace(/\\/g, '/'), 
+          reactionUploadedAt: new Date(), 
+          needsFixing: false 
+        },
+        include: { channel: true, originalVideo: true }
       });
 
       const staff = await prisma.user.findMany({ 
@@ -239,45 +258,109 @@ module.exports = (io) => {
         select: { id: true }
       });
 
-      staff.forEach(s => {
+      // Рассылка персоналу
+      for (const s of staff) {
+        // 1. Сохраняем в базу (История)
+        await prisma.notification.create({
+          data: {
+            userId: s.id,
+            title: "Реакция готова ✅",
+            message: `${req.user.username} сдал видео по каналу ${updatedTask.channel.name}`,
+            type: "REACTION_UPLOADED"
+          }
+        }).catch(e => console.error("Error creating notification log:", e));
+
+        // 2. Пуш-уведомление
         sendPushNotification(s.id, {
           title: "Реакция готова ✅",
           message: `${req.user.username} сдал видео. Можно публиковать!`,
           url: "/manager"
         });
-      });
+
+        // 3. Сигнал через сокеты для мгновенного обновления колокольчика
+        io.to(`user_${s.id}`).emit('new_notification');
+      }
+
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // --- ОТКЛОНЕНИЕ (MANAGER) ---
   router.post('/:id/reject', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
     const { reason } = req.body;
-    const task = await prisma.task.update({
-      where: { id: parseInt(req.params.id) },
-      data: { status: 'IN_PROGRESS', needsFixing: true, rejectionReason: reason },
-      include: { creator: true, channel: true }
-    });
-    sendPushNotification(task.creatorId, {
-      title: "Нужны правки ⚠️",
-      message: `Видео по каналу ${task.channel.name} отклонено: ${reason}`,
-      url: "/creator"
-    });
-    res.json({ success: true });
+    try {
+      const task = await prisma.task.update({
+        where: { id: parseInt(req.params.id) },
+        data: { status: 'IN_PROGRESS', needsFixing: true, rejectionReason: reason },
+        include: { creator: true, channel: true, originalVideo: true }
+      });
+
+      if (task.creatorId) {
+        // 1. Сохраняем в базу (История)
+        await prisma.notification.create({
+          data: {
+            userId: task.creatorId,
+            title: "Нужны правки ⚠️",
+            message: `Видео по каналу ${task.channel.name} отклонено: ${reason}`,
+            type: "REVISION_NEEDED"
+          }
+        });
+
+        // 2. Пуш-уведомление
+        sendPushNotification(task.creatorId, {
+          title: "Нужны правки ⚠️",
+          message: `Видео по каналу ${task.channel.name} отклонено: ${reason}`,
+          url: "/creator"
+        });
+
+        // 3. Сокет
+        io.to(`user_${task.creatorId}`).emit('new_notification');
+      }
+
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // --- ПУБЛИКАЦИЯ (MANAGER) ---
   router.post('/:id/publish', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
     const { youtubeUrl, scheduledAt } = req.body;
-    const task = await prisma.task.update({
-      where: { id: parseInt(req.params.id) },
-      data: { status: 'PUBLISHED', youtubeUrl, scheduledAt: scheduledAt ? new Date(scheduledAt) : null, publishedAt: new Date(), uploaderId: req.user.id },
-      include: { originalVideo: true }
-    });
-    sendPushNotification(task.creatorId, {
-      title: "Видео опубликовано! 🎉",
-      message: `Ваша работа по видео "${task.originalVideo.title}" уже на YouTube.`,
-      url: "/creator"
-    });
-    res.json({ success: true });
+    try {
+      const task = await prisma.task.update({
+        where: { id: parseInt(req.params.id) },
+        data: { 
+          status: 'PUBLISHED', 
+          youtubeUrl, 
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : null, 
+          publishedAt: new Date(), 
+          uploaderId: req.user.id 
+        },
+        include: { originalVideo: true, channel: true }
+      });
+
+      if (task.creatorId) {
+        // 1. Сохраняем в базу (История)
+        await prisma.notification.create({
+          data: {
+            userId: task.creatorId,
+            title: "Видео опубликовано! 🎉",
+            message: `Ваша работа по видео "${task.originalVideo.title}" уже на YouTube.`,
+            type: "PUBLISHED"
+          }
+        });
+
+        // 2. Пуш-уведомление
+        sendPushNotification(task.creatorId, {
+          title: "Видео опубликовано! 🎉",
+          message: `Ваша работа по видео "${task.originalVideo.title}" уже на YouTube.`,
+          url: "/creator"
+        });
+
+        // 3. Сокет
+        io.to(`user_${task.creatorId}`).emit('new_notification');
+      }
+
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   router.patch('/:id', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
@@ -304,6 +387,43 @@ module.exports = (io) => {
       const history = await prisma.task.count({ where: { creatorId: req.user.id, status: 'REACTION_UPLOADED', scheduledAt: { lt: now } } });
       res.json({ my: my > 0, available: available > 0, history: history > 0 });
     } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // 1. Получить уведомления юзера
+  router.get('/notifications', protect, async (req, res) => {
+    const notifications = await prisma.notification.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    res.json(notifications);
+  });
+
+  // 2. Пометить все как прочитанные
+  router.post('/notifications/read-all', protect, async (req, res) => {
+    await prisma.notification.updateMany({
+      where: { userId: req.user.id, isRead: false },
+      data: { isRead: true }
+    });
+    res.json({ success: true });
+  });
+
+  // 3. Получить настройки
+  router.get('/notifications/preferences', protect, async (req, res) => {
+    let prefs = await prisma.userPreference.findUnique({ where: { userId: req.user.id } });
+    if (!prefs) {
+      prefs = await prisma.userPreference.create({ data: { userId: req.user.id } });
+    }
+    res.json(prefs);
+  });
+
+  // 4. Обновить настройки
+  router.patch('/notifications/preferences', protect, async (req, res) => {
+    const updated = await prisma.userPreference.update({
+      where: { userId: req.user.id },
+      data: req.body
+    });
+    res.json(updated);
   });
 
   return router;

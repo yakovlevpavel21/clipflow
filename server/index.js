@@ -34,6 +34,7 @@ app.set('activeUsers', activeUsers); // Делаем Map доступным в �
 io.on('connection', (socket) => {
   socket.on('user_online', (userId) => {
     const id = parseInt(userId);
+    socket.join(`user_${id}`);
     socket.userId = id;
     if (!activeUsers.has(id)) {
       activeUsers.set(id, new Set());

@@ -1,73 +1,74 @@
-// client/src/components/Layout.jsx
 import { useState, useEffect } from 'react';
-import api from '../api';
+import api, { socket, subscribeUserToPush } from '../api';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, Upload, Settings, 
-  Menu, X, Sun, Moon, LogOut, Zap, User 
+  Menu, X, Sun, Moon, LogOut, Zap, User, Bell 
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 
 export default function Layout({ onLogout, user }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
 
-  const subscribeToPush = async () => {
-    if (!('serviceWorker' in navigator)) return;
-
+  // 1. Функция проверки уведомлений
+  const checkNotifications = async () => {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-
-      // Проверяем, есть ли уже подписка
-      let subscription = await registration.pushManager.getSubscription();
-
-      if (!subscription) {
-        const publicKey = urlBase64ToUint8Array('BJOKOTJYP_yKaTE_y1PT5LJ5xIOhNu1pDe4SQxZpYKuBsSVNspTDSGOUFjoPpeVG1z-Diz2SnbXb7BSsjiudkNs');
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: publicKey
-        });
-      }
-
-      // ВАЖНО: Мы должны отправить подписку как обычный JSON объект
-      const subJSON = subscription.toJSON();
-      
-      console.log("Отправка подписки на сервер...", subJSON);
-      await api.post('/api/auth/subscribe', subJSON);
-      console.log("Подписка сохранена в БД");
-
+      const res = await api.get('/api/tasks/notifications');
+      // Считаем только те, у которых isRead === false
+      const unread = res.data.filter(n => !n.isRead).length;
+      setUnreadCount(unread);
     } catch (err) {
-      console.error("Ошибка подписки:", err);
+      console.error("Ошибка загрузки счетчика уведомлений", err);
     }
   };
 
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-      .replace(/\-/g, '+')
-      .replace(/_/g, '/');
-
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  }
-
+  // 2. Инициализация уведомлений и сокетов
   useEffect(() => {
-    if (user) subscribeToPush();
+    if (user) {
+      checkNotifications();
+      
+      // Подписываемся на событие новых уведомлений
+      socket.on('new_notification', () => {
+        checkNotifications();
+        // Можно добавить системный звук или вибрацию здесь
+      });
+
+      return () => socket.off('new_notification');
+    }
   }, [user]);
 
-  // Определяем, какие пункты меню показывать на основе роли
+  // 3. Автоматическая подписка на пуши при входе
+  useEffect(() => {
+    if (user) {
+      subscribeUserToPush();
+    }
+  }, [user]);
+
+  // 4. Определение пунктов меню
   const menuItems = [
     { to: "/", icon: <LayoutDashboard size={20} />, label: "Дашборд", roles: ['ADMIN', 'MANAGER', 'CREATOR'] },
     { to: "/manager", icon: <Settings size={20} />, label: "Менеджер", roles: ['ADMIN', 'MANAGER'] },
     { to: "/creator", icon: <Video size={20} />, label: "Креатор", roles: ['ADMIN', 'MANAGER', 'CREATOR'] },
     { to: "/admin", icon: <Zap size={20} />, label: "Админ", roles: ['ADMIN'] },
+    { 
+      to: "/notifications", 
+      icon: (
+        <div className="relative">
+          <Bell size={20} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white dark:border-slate-900"></span>
+            </span>
+          )}
+        </div>
+      ), 
+      label: "Уведомления", 
+      roles: ['ADMIN', 'MANAGER', 'CREATOR'] 
+    }
   ];
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(user.role));
@@ -84,7 +85,7 @@ export default function Layout({ onLogout, user }) {
       ">
         <button 
           onClick={() => setIsMenuOpen(true)}
-          className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+          className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 active:scale-95 transition-transform"
         >
           <Menu size={24} />
         </button>
@@ -95,12 +96,19 @@ export default function Layout({ onLogout, user }) {
           </div>
           <h1 className="text-lg font-bold tracking-tight uppercase">Clipsio</h1>
         </div>
-        <div className="w-10"></div> 
+
+        {/* Колокольчик в мобильной шапке для быстрого доступа */}
+        <Link to="/notifications" className="relative p-2 text-slate-400">
+          <Bell size={24} />
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-white dark:border-[#1a1f2e] rounded-full" />
+          )}
+        </Link>
       </header>
 
       {/* --- SIDEBAR --- */}
       <aside className={`
-        fixed lg:sticky top-0 left-0 z-[110] /* Подняли z-index выше шапки (100) */
+        fixed lg:sticky top-0 left-0 z-[110]
         w-72 h-screen 
         bg-white dark:bg-[#1a1f2e] border-r border-slate-200 dark:border-slate-800 
         transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
@@ -109,7 +117,6 @@ export default function Layout({ onLogout, user }) {
       `}>
         <div className="p-6 flex flex-col h-full w-full">
           
-          {/* Logo Section */}
           <div className="flex items-center justify-between mb-10">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -120,7 +127,6 @@ export default function Layout({ onLogout, user }) {
             <button onClick={() => setIsMenuOpen(false)} className="lg:hidden p-2 text-slate-400"><X size={24} /></button>
           </div>
           
-          {/* User Info Card */}
           <div className="mb-8 p-4 bg-slate-50 dark:bg-[#0a0f1c] rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <User size={20} />
@@ -131,7 +137,6 @@ export default function Layout({ onLogout, user }) {
             </div>
           </div>
 
-          {/* Navigation Links */}
           <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1 no-scrollbar">
             {filteredMenu.map((item) => (
               <Link 
@@ -150,7 +155,6 @@ export default function Layout({ onLogout, user }) {
             ))}
           </nav>
 
-          {/* Bottom Actions */}
           <div className="mt-auto pt-6 space-y-2 border-t border-slate-100 dark:border-slate-800">
             <button 
               onClick={toggleTheme}
@@ -160,26 +164,23 @@ export default function Layout({ onLogout, user }) {
               <span>{theme === 'dark' ? 'Светлая тема' : 'Темная тема'}</span>
             </button>
 
-            {/* КНОПКА ВЫХОДА */}
             <button 
               onClick={onLogout}
               className="flex items-center gap-3 w-full p-3.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10 transition text-slate-500 dark:text-slate-400 hover:text-red-600 font-semibold text-sm"
             >
               <LogOut size={20} />
-              <span>Выйти из аккаунта</span>
+              <span>Выйти</span>
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 min-w-0 pt-[calc(env(safe-area-inset-top)+64px)] lg:pt-0">
         <div className="p-4 md:p-8 lg:p-10 max-w-6xl mx-auto w-full">
           <Outlet />
         </div>
       </main>
 
-      {/* Mobile Overlay */}
       {isMenuOpen && (
         <div 
           className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[55] lg:hidden animate-in fade-in duration-300" 

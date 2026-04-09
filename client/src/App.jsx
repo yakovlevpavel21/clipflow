@@ -6,6 +6,7 @@ import ManagerPage from './pages/ManagerPage';
 import CreatorPage from './pages/CreatorPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
+import NotificationsPage from './pages/NotificationsPage';
 import api, { socket } from './api'; // Импортируем наш настроенный сокет
 
 export default function App() {
@@ -68,6 +69,8 @@ export default function App() {
             {user.role === 'ADMIN' && (
               <Route path="admin" element={<AdminPage />} />
             )}
+
+            <Route path="notifications" element={<NotificationsPage />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

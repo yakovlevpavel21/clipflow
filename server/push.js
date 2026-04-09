@@ -12,6 +12,9 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 }
 
 const sendPushNotification = async (userId, payload) => {
+  const prefs = await prisma.userPreference.findUnique({ where: { userId: parseInt(userId) } });
+  if (prefs && !prefs.enabled) return;
+  
   if (!process.env.VAPID_PUBLIC_KEY) return;
 
   try {

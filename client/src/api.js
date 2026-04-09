@@ -36,4 +36,42 @@ export const fetchFileAsBlob = async (url) => {
   return await response.blob();
 };
 
+export async function subscribeUserToPush() {
+  if (!('serviceWorker' in navigator)) return false;
+
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      const publicKey = 'BJOKOTJYP_yKaTE_y1PT5LJ5xIOhNu1pDe4SQxZpYKuBsSVNspTDSGOUFjoPpeVG1z-Diz2SnbXb7BSsjiudkNs';
+      
+      // Вспомогательная функция внутри
+      const padding = '='.repeat((4 - publicKey.length % 4) % 4);
+      const base64 = (publicKey + padding).replace(/\-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: outputArray
+      });
+    }
+
+    await api.post('/api/auth/subscribe', subscription.toJSON());
+    return true;
+  } catch (err) {
+    console.error("Push error:", err);
+    return false;
+  }
+}
+
+export const getNotifications = () => api.get('/api/tasks/notifications');
+export const markNotificationsRead = () => api.post('/api/tasks/notifications/read-all');
+export const getPreferences = () => api.get('/api/tasks/notifications/preferences');
+export const updatePreferences = (data) => api.patch('/api/tasks/notifications/preferences', data);
+
 export default api;

@@ -41,6 +41,27 @@ model User {
   managed    Task[]   @relation("ManagerTasks") // Задачи, созданные этим менеджером
   createdAt  DateTime @default(now())
   pushSubscriptions PushSubscription[]
+
+  notifications Notification[]
+  preference    UserPreference?
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   // TASK_ASSIGNED, REVISION_NEEDED, PUBLISHED, SYSTEM
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model UserPreference {
+  id        Int     @id @default(autoincrement())
+  userId    Int     @unique
+  user      User    @relation(fields: [userId], references: [id])
+  enabled   Boolean @default(true) // Единственная настройка: Вкл/Выкл всё
 }
 
 model PushSubscription {
