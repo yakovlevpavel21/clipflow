@@ -127,6 +127,8 @@ module.exports = (io) => {
             }
           }).catch(e => console.error("History Log Error:", e));
 
+          io.to(`user_${task.creatorId}`).emit('new_notification');
+
           // 2. Отправляем Push (внутри него будет проверка настроек пользователя)
           sendPushNotification(task.creatorId, {
             title: title,
@@ -275,6 +277,8 @@ module.exports = (io) => {
           }
         }).catch(e => console.error("Error creating notification log:", e));
 
+        io.to(`user_${s.id}`).emit('new_notification');
+
         // 2. Пуш-уведомление
         sendPushNotification(s.id, {
           title: "Реакция готова ✅",
@@ -312,6 +316,8 @@ module.exports = (io) => {
             type: "REVISION_NEEDED"
           }
         });
+
+        io.to(`user_${task.creatorId}`).emit('new_notification');
 
         // 2. Пуш-уведомление
         sendPushNotification(task.creatorId, {
@@ -356,6 +362,8 @@ module.exports = (io) => {
             type: "PUBLISHED"
           }
         });
+
+        io.to(`user_${task.creatorId}`).emit('new_notification');
 
         // 2. Пуш-уведомление
         sendPushNotification(task.creatorId, {

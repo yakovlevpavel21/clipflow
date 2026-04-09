@@ -27,12 +27,19 @@ export default function Layout({ onLogout, user }) {
 
   // 2. Инициализация уведомлений и сокетов
   useEffect(() => {
-    if (user) {
+    if (user && socket) {
+      // 1. Проверяем при входе
       checkNotifications();
-      
-      // Слушаем 'new_notification' (он теперь срабатывает и при прочтении тоже)
+
+      // 2. Слушаем бэкенд в реальном времени
       socket.on('new_notification', () => {
-        checkNotifications();
+        console.log("Получено новое уведомление!");
+        checkNotifications(); // Эта функция просто делает GET /api/tasks/notifications и обновляет unreadCount
+        
+        // БОНУС: можно заставить телефон вибрировать при получении (если в PWA)
+        if ('vibrate' in navigator) {
+          navigator.vibrate(200);
+        }
       });
 
       return () => socket.off('new_notification');
@@ -55,13 +62,11 @@ export default function Layout({ onLogout, user }) {
     { 
       to: "/notifications", 
       icon: (
-        <div className="relative inline-flex items-center">
+        <div className="relative">
           <Bell size={20} />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-              {/* Пульсация для привлечения внимания */}
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              {/* Сама точка */}
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-white dark:border-slate-900"></span>
             </span>
           )}
@@ -102,7 +107,10 @@ export default function Layout({ onLogout, user }) {
         <Link to="/notifications" className="relative p-2 text-slate-400">
           <Bell size={24} />
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-white dark:border-[#1a1f2e] rounded-full" />
+            <span className="absolute top-1.5 right-1.5 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white dark:border-[#1a1f2e]"></span>
+            </span>
           )}
         </Link>
       </header>
