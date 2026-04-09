@@ -5,7 +5,7 @@ import {
   Plus, List, Calendar, X, Loader2, CheckCircle2, 
   Clock, Send, Zap, Filter, Sparkles, Search 
 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // Компоненты
 import PageStatus from '../components/PageStatus';
@@ -45,6 +45,7 @@ export default function ManagerPage() {
   const [activePreview, setActivePreview] = useState(null);
 
   const location = useLocation();
+  const navigate = useNavigate();
 
   // 1. ПЕРВИЧНАЯ И ПОЛНАЯ ЗАГРУЗКА (При смене таба или фильтра)
   const initPage = async () => {
@@ -98,22 +99,35 @@ export default function ManagerPage() {
     if (location.state?.targetTab) {
       setTab(location.state.targetTab);
     }
-  }, [location.state]);
+  }, [location.state?.targetTab]);
 
   useEffect(() => {
-    if (location.state?.scrollToTaskId && tasks.length > 0) {
-      const taskId = location.state.scrollToTaskId;
-      
-      setTimeout(() => {
+    const taskId = location.state?.scrollToTaskId;
+    
+    if (taskId && tasks.length > 0) {
+      const timer = setTimeout(() => {
         const element = document.getElementById(`task-${taskId}`);
+        
         if (element) {
+          // Плавный скролл
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.classList.add('ring-2', 'ring-blue-500', 'ring-offset-4');
-          setTimeout(() => element.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-4'), 3000);
+          
+          // Подсветка (синее кольцо)
+          element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-4', 'transition-all');
+
+          // ОЧИСТКА: удаляем scrollToTaskId из истории браузера
+          navigate(location.pathname, { replace: true, state: {} });
+
+          // Убираем подсветку через 3 секунды
+          setTimeout(() => {
+            element.classList.remove('ring-4', 'ring-blue-500');
+          }, 3000);
         }
-      }, 600);
+      }, 800); // Задержка, чтобы список успел отрендериться
+
+      return () => clearTimeout(timer);
     }
-  }, [location.state, tasks]);
+  }, [tasks, location.state, navigate, location.pathname]);
 
   // 2. ПОДГРУЗКА ДАННЫХ ПРИ СКРОЛЛЕ
   const fetchMoreTasks = async () => {

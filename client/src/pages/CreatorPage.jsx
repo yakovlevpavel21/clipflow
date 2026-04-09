@@ -6,7 +6,7 @@ import TaskCard from '../components/TaskCard';
 import UploadModal from '../components/UploadModal';
 import VideoModal from '../components/VideoModal';
 import PageStatus from '../components/PageStatus';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function CreatorPage() {
   const [tasks, setTasks] = useState([]); // Текущий список задач для выбранного таба
@@ -29,6 +29,7 @@ export default function CreatorPage() {
   const ITEMS_PER_PAGE = 10;
 
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     isFetchingRef.current = false;
@@ -39,29 +40,30 @@ export default function CreatorPage() {
     if (location.state?.targetTab) {
       setTab(location.state.targetTab);
     }
-  }, [location.state]);
+  }, [location.state?.targetTab]);
 
   useEffect(() => {
-    // Начинаем искать элемент только когда загружены задачи и выбран правильный таб
-    if (location.state?.scrollToTaskId && tasks.length > 0) {
-      const taskId = location.state.scrollToTaskId;
-
+    const taskId = location.state?.scrollToTaskId;
+    
+    if (taskId && tasks.length > 0) {
       const timer = setTimeout(() => {
         const element = document.getElementById(`task-${taskId}`);
+        
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-4');
-          
-          // Очищаем стейт, чтобы не скроллило при обычном обновлении
-          window.history.replaceState({}, document.title);
-          
-          setTimeout(() => element.classList.remove('ring-4', 'ring-blue-500'), 3000);
+          element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-4', 'transition-all');
+
+          navigate(location.pathname, { replace: true, state: {} });
+
+          setTimeout(() => {
+            element.classList.remove('ring-4', 'ring-blue-500');
+          }, 3000);
         }
-      }, 800); // Чуть больше задержка, чтобы данные успели отрисоваться
-      
+      }, 800);
+
       return () => clearTimeout(timer);
     }
-  }, [tasks, location.state]);
+  }, [tasks, location.state, navigate, location.pathname]); 
 
   // 1. Инициализация (сброс и первая загрузка)
   const initPage = async () => {
