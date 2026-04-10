@@ -51,7 +51,7 @@ model Notification {
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   taskId    Int?
-  targetTab String?  // Добавляем это поле (например: "my", "available", "history", "active")
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull) 
   title     String
   message   String
   type      String   
@@ -82,7 +82,7 @@ model Channel {
   titlePrefix         String?  @default("")
   descriptionFooter   String?  @default("")
   showOriginalLink    Boolean  @default(true)
-  originalLinkPrefix  String?  @default("CREDIT - ")
+  originalLinkPrefix  String?  @default("")
   tasks              Task[]
   createdAt          DateTime @default(now())
 }
@@ -146,4 +146,6 @@ model Task {
   needsFixing      Boolean        @default(false)
   rejectionReason  String?
   updatedAt        DateTime       @updatedAt
+  
+  notifications    Notification[]
 }

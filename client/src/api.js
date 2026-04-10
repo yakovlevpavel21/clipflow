@@ -71,9 +71,16 @@ export async function subscribeUserToPush() {
   }
 }
 
-export const getNotifications = (skip = 0, take = 15) => api.get(`/api/tasks/notifications?skip=${skip}&take=${take}`);
-export const markNotifRead = (id) => api.post(`/api/tasks/notifications/${id}/read`);
-export const getPreferences = () => api.get('/api/tasks/notifications/preferences');
-export const updatePreferences = (data) => api.patch('/api/tasks/notifications/preferences', data);
+export const getNotifications = (skip = 0, take = 20) => 
+  api.get(`/api/tasks/notifications?skip=${skip}&take=${take}`);
+
+export const markNotificationsRead = () => 
+  api.post('/api/tasks/notifications/read-all');
+
+export const getPreferences = () => 
+  api.get('/api/tasks/notifications/preferences');
+
+export const updatePreferences = (data) => 
+  api.patch('/api/tasks/notifications/preferences', data);
 
 export default api;

@@ -95,20 +95,6 @@ export default function UserModal({ user, onClose, onSave }) {
                 </select>
               </div>
             </div>
-
-            {/* Telegram */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Telegram ник (для уведомлений)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">@</span>
-                <input 
-                  placeholder="username"
-                  value={formData.tgUsername}
-                  onChange={e => setFormData({...formData, tgUsername: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-slate-900/50 p-3 pl-8 rounded-xl border border-slate-200 dark:border-slate-800 text-sm outline-none focus:border-blue-500 transition-all"
-                />
-              </div>
-            </div>
           </div>
 
           <button 

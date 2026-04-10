@@ -4,51 +4,76 @@ const router = express.Router();
 const prisma = require('../db');
 const { protect } = require('../auth');
 
-router.get('/', protect, async (req, res) => {
-  const activeUsers = req.app.get('activeUsers'); // Берем Map из настроек приложения
+router.get('/profile-stats/:userId', protect, async (req, res) => {
+  const targetId = parseInt(req.params.userId);
+  const { month } = req.query; // Формат: "2023-10" или "all"
 
   try {
-    const [total, awaiting, inProgress, submitted, published] = await Promise.all([
-      prisma.task.count(),
-      prisma.task.count({ where: { status: 'AWAITING_REACTION' } }),
-      prisma.task.count({ where: { status: 'IN_PROGRESS' } }),
-      prisma.task.count({ where: { status: 'REACTION_UPLOADED' } }),
-      prisma.task.count({ where: { status: 'PUBLISHED' } }),
-    ]);
+    let dateFilter = {};
+    if (month && month !== 'all') {
+      const [year, m] = month.split('-');
+      dateFilter = {
+        publishedAt: {
+          gte: new Date(year, m - 1, 1),
+          lt: new Date(year, m, 1),
+        }
+      };
+    }
 
-    const creatorsData = await prisma.user.findMany({
-      where: { role: 'CREATOR' },
-      select: {
-        id: true,
-        username: true,
-        lastActive: true,
-        _count: { select: { tasks: { where: { status: 'PUBLISHED' } } } }
-      },
-      orderBy: { tasks: { _count: 'desc' } },
-      take: 5
+    // 1. Информация о пользователе
+    const user = await prisma.user.findUnique({
+      where: { id: targetId },
+      select: { id: true, username: true, role: true, createdAt: true }
     });
 
-    const channels = await prisma.channel.findMany({ 
-      include: { _count: { select: { tasks: true } } } 
+    // 2. Статистика как КРЕАТОРА
+    const creatorStats = await prisma.task.findMany({
+      where: { creatorId: targetId, status: 'PUBLISHED', ...dateFilter },
+      include: { channel: true, originalVideo: true }
     });
 
-    const recent = await prisma.task.findMany({ 
-      take: 5, 
-      orderBy: { updatedAt: 'desc' }, 
-      include: { originalVideo: true, channel: true } 
+    // 3. Статистика как МЕНЕДЖЕРА
+    const managerStats = await prisma.task.findMany({
+      where: { managerId: targetId, status: 'PUBLISHED', ...dateFilter },
+      include: { channel: true, originalVideo: true }
     });
+
+    // Хелпер для агрегации по каналам
+    const groupByChannel = (data) => {
+      const map = {};
+      data.forEach(t => {
+        const name = t.channel.name;
+        map[name] = (map[name] || 0) + 1;
+      });
+      return Object.entries(map).map(([name, value]) => ({ name, value }));
+    };
+
+    // Хелпер для агрегации по дням (для графика)
+    const groupByDay = (data) => {
+      const map = {};
+      data.forEach(t => {
+        const day = new Date(t.publishedAt).getDate();
+        map[day] = (map[day] || 0) + 1;
+      });
+      return Object.entries(map)
+        .map(([day, count]) => ({ day: parseInt(day), count }))
+        .sort((a, b) => a.day - b.day);
+    };
 
     res.json({
-      counters: { totalTasks: total, awaiting, inProgress, submitted, published },
-      channels: channels.map(c => ({ name: c.name, count: c._count.tasks })),
-      creators: creatorsData.map(c => ({
-        id: c.id,
-        name: c.username,
-        count: c._count.tasks,
-        lastActive: c.lastActive,
-        isOnline: activeUsers.has(c.id)
-      })),
-      recent
+      user,
+      creator: {
+        total: creatorStats.length,
+        byChannel: groupByChannel(creatorStats),
+        byDay: groupByDay(creatorStats),
+        list: creatorStats
+      },
+      manager: {
+        total: managerStats.length,
+        byChannel: groupByChannel(managerStats),
+        byDay: groupByDay(managerStats),
+        list: managerStats
+      }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

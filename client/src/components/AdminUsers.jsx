@@ -1,7 +1,9 @@
 import { Users, Trash2, Edit3, BarChart2, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminUsers({ users, now, onEdit, onDelete, onAdd }) {
-  
+  const navigate = useNavigate();
+
   const getUserStatus = (user) => {
     if (user.isOnline) return { label: 'В сети', color: 'text-emerald-500', dot: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' };
     if (!user.lastActive) return { label: 'Офлайн', color: 'text-slate-400', dot: 'bg-slate-300 dark:bg-slate-600' };
@@ -86,7 +88,10 @@ export default function AdminUsers({ users, now, onEdit, onDelete, onAdd }) {
                   <span>Правка</span>
                 </button>
                 
-                <button className={actionBtnClass}>
+                <button 
+                  onClick={() => navigate(`/profile/${u.id}`)}
+                  className={actionBtnClass}
+                >
                   <BarChart2 size={14} />
                   <span>Статистика</span>
                 </button>

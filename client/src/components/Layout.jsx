@@ -33,15 +33,10 @@ export default function Layout({ onLogout, user }) {
 
       // Слушаем сигнал
       const handleNewNotif = () => {
-        console.log("🔔 СОКЕТ: Получено новое уведомление!");
-        checkNotifications(); // Перезагружает цифру в unreadCount
+        checkNotifications();
       };
 
       socket.on('new_notification', handleNewNotif);
-
-      // Логи для отладки подключения
-      socket.on('connect', () => console.log("✅ Сокет подключен"));
-      socket.on('disconnect', () => console.log("❌ Сокет отключен"));
 
       return () => {
         socket.off('new_notification', handleNewNotif);
@@ -54,13 +49,20 @@ export default function Layout({ onLogout, user }) {
   // 3. Автоматическая подписка на пуши при входе
   useEffect(() => {
     if (user) {
-      subscribeUserToPush();
+      checkNotifications(); // Проверка при входе
+
+      // Слушаем сигнал от бэкенда (срабатывает при новых уведомлениях и при mark-all-read)
+      socket.on('new_notification', () => {
+        checkNotifications(); // Эта функция обновит unreadCount
+      });
+
+      return () => socket.off('new_notification');
     }
   }, [user]);
 
   // 4. Определение пунктов меню
   const menuItems = [
-    { to: "/", icon: <LayoutDashboard size={20} />, label: "Дашборд", roles: ['ADMIN', 'MANAGER', 'CREATOR'] },
+    { to: "/", icon: <LayoutDashboard size={20} />, label: "Дашборд", roles: ['ADMIN'] },
     { to: "/manager", icon: <Settings size={20} />, label: "Менеджер", roles: ['ADMIN', 'MANAGER'] },
     { to: "/creator", icon: <Video size={20} />, label: "Креатор", roles: ['ADMIN', 'MANAGER', 'CREATOR'] },
     { to: "/admin", icon: <Zap size={20} />, label: "Админ", roles: ['ADMIN'] },
@@ -141,15 +143,19 @@ export default function Layout({ onLogout, user }) {
             <button onClick={() => setIsMenuOpen(false)} className="lg:hidden p-2 text-slate-400"><X size={24} /></button>
           </div>
           
-          <div className="mb-8 p-4 bg-slate-50 dark:bg-[#0a0f1c] rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+          <Link 
+            to={`/profile/${user.id}`} 
+            onClick={() => setIsMenuOpen(false)} // <--- ДОБАВЬТЕ ЭТУ СТРОКУ
+            className="mb-8 p-4 bg-slate-50 dark:bg-[#0a0f1c] rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 hover:border-blue-500/30 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
               <User size={20} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{user.username}</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-white truncate uppercase">{user.username}</p>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{user.role}</p>
             </div>
-          </div>
+          </Link>
 
           <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1 no-scrollbar">
             {filteredMenu.map((item) => (
@@ -189,7 +195,7 @@ export default function Layout({ onLogout, user }) {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 pt-[calc(env(safe-area-inset-top)+64px)] lg:pt-0">
+      <main className="flex-1 min-w-0 pt-[calc(env(safe-area-inset-top)+64px)] lg:pt-0 pb-[env(safe-area-inset-bottom)] overflow-x-hidden">
         <div className="p-4 md:p-8 lg:p-10 max-w-6xl mx-auto w-full">
           <Outlet />
         </div>

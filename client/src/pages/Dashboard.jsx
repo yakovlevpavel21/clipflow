@@ -1,201 +1,255 @@
-// client/src/pages/Dashboard.jsx
-import { useEffect, useState } from 'react';
-import api, { socket } from '../api'; // Импортируем сокет для real-time
+import { useState, useEffect, useMemo } from 'react';
+import api, { socket } from '../api';
 import { 
-  CheckCircle2, Clock, Send, Layers, ArrowUpRight, PlayCircle, Activity, Zap, Users, Loader2, Video
+  Activity, Clock, User, Shield, Play, 
+  CheckCircle2, Loader2, Layers, Users, ChevronDown,
 } from 'lucide-react';
-import PageStatus from '../components/PageStatus';
+import { Link } from 'react-router-dom'; 
+import VideoModal from '../components/VideoModal';
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [channels, setChannels] = useState([]);
+  const [creators, setCreators] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [activePreview, setActivePreview] = useState(null);
+  const [highlightedId, setHighlightedId] = useState(null);
 
-  const fetchStats = async () => {
-    setLoading(true);
-    setError(null);
+  // Фильтры
+  const [filterChannel, setFilterChannel] = useState('all');
+  const [filterCreator, setFilterCreator] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+
+  const fetchData = async () => {
     try {
-      const res = await api.get('/api/stats');
-      setStats(res.data);
-    } catch (err) {
-      console.error(err);
-      setError("Не удалось загрузить данные");
-    } finally {
-      setLoading(false);
-    }
+      const [tRes, cRes, uRes] = await Promise.all([
+        api.get('/api/admin/dashboard-tasks'),
+        api.get('/api/channels'),
+        api.get('/api/tasks/creators')
+      ]);
+      setTasks(tRes.data);
+      setChannels(cRes.data);
+      setCreators(uRes.data);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => {
-    fetchStats();
+    fetchData();
 
-    // Слушаем изменения статуса
-    socket.on('status_change', (data) => {
-      setStats(prev => {
-        if (!prev || !prev.creators) return prev;
-        
-        return {
-          ...prev,
-          creators: prev.creators.map(c => {
-            // Сверяем ID (приводим к числу для надежности)
-            if (Number(c.id) === Number(data.userId)) {
-              return { ...c, isOnline: data.online };
-            }
-            return c;
-          })
-        };
+    socket.on('task_updated', (updatedTask) => {
+      setTasks(prev => {
+        if (updatedTask.status === 'PUBLISHED') {
+          return prev.filter(t => t.id !== updatedTask.id);
+        }
+        const exists = prev.find(t => t.id === updatedTask.id);
+        if (exists) {
+          return prev.map(t => t.id === updatedTask.id ? updatedTask : t);
+        }
+        return [updatedTask, ...prev];
       });
+
+      setHighlightedId(updatedTask.id);
+      setTimeout(() => setHighlightedId(null), 3000);
     });
 
-    return () => socket.off('status_change');
+    return () => socket.off('task_updated');
   }, []);
 
-  if (loading || error) {
-    return <PageStatus loading={loading} error={error} onRetry={fetchStats} />;
-  }
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(t => {
+      const matchChan = filterChannel === 'all' || t.channelId === Number(filterChannel);
+      const matchUser = filterCreator === 'all' || t.creatorId === Number(filterCreator);
+      const matchStatus = filterStatus === 'all' || t.status === filterStatus;
+      return matchChan && matchUser && matchStatus;
+    });
+  }, [tasks, filterChannel, filterCreator, filterStatus]);
 
-  if (!stats || !stats.counters) return null;
+  const formatDate = (date) => {
+    if (!date) return '---';
+    return new Date(date).toLocaleString('ru-RU', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+    }).replace('.', '');
+  };
 
-  const { counters, channels, recent, creators } = stats;
+  const getStatusBadge = (status) => {
+    const configs = {
+      AWAITING_REACTION: { label: 'Ожидает', color: 'bg-slate-100 text-slate-500' },
+      IN_PROGRESS: { label: 'В работе', color: 'bg-amber-100 text-amber-600' },
+      REACTION_UPLOADED: { label: 'Готово', color: 'bg-emerald-500 text-white' }
+    };
+    const config = configs[status] || configs.AWAITING_REACTION;
+    return <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${config.color}`}>{config.label}</span>;
+  };
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" size={32} /></div>;
 
   return (
-    <div className="max-w-6xl mx-auto pb-24 px-4 font-['Inter']">
+    <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter']">
       
-      {/* HEADER */}
-      <header className="pt-10 mb-10 px-1 animate-in fade-in slide-in-from-top-4 duration-700">
-        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
-          Дашборд
-        </h1>
-        <p className="text-sm md:text-base text-slate-500 font-medium mt-2">
-          Общий обзор производительности Clipsio в реальном времени.
-        </p>
+      {/* HEADER - Тот же стиль */}
+      <header className="pt-10 mb-8 px-1 animate-in fade-in duration-700">
+        <div className="flex flex-row items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Дашборд
+            </h1>
+            <p className="text-sm md:text-base text-slate-500 font-medium leading-relaxed">
+              Централизованное отслеживание активных процессов системы в реальном времени.
+            </p>
+          </div>
+
+          {/* ПЛАШКА LIVE СПРАВА */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-1 md:mt-2">
+            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] leading-none">Live</span>
+          </div>
+        </div>
       </header>
 
-      {/* STAT CARDS GRID */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10">
-        <StatCard title="Всего" value={counters.totalTasks} icon={<Layers size={20} />} color="blue" />
-        <StatCard title="Ожидают" value={counters.awaiting} icon={<Clock size={20} />} color="amber" />
-        <StatCard title="Проверка" value={counters.submitted} icon={<Send size={20} />} color="indigo" />
-        <StatCard title="Готово" value={counters.published} icon={<CheckCircle2 size={20} />} color="green" />
+      {/* FILTERS - Горизонтальный скролл на мобилках */}
+      <div className="sticky top-0 lg:top-0 max-lg:top-[64px] z-40 bg-slate-50 dark:bg-[#0a0f1c] -mx-4 px-4 border-b dark:border-slate-800 transition-all">
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-4 px-1">
+          <FilterSelect 
+            icon={<Layers size={14}/>} 
+            value={filterChannel} 
+            onChange={setFilterChannel}
+            options={[{id: 'all', name: 'Все каналы'}, ...channels]} 
+          />
+          <FilterSelect 
+            icon={<Users size={14}/>} 
+            value={filterCreator} 
+            onChange={setFilterCreator}
+            options={[{id: 'all', username: 'Все авторы'}, ...creators]} 
+            labelKey="username"
+          />
+          <FilterSelect 
+            icon={<Activity size={14}/>} 
+            value={filterStatus} 
+            onChange={setFilterStatus}
+            options={[
+              {id: 'all', name: 'Все статусы'},
+              {id: 'AWAITING_REACTION', name: 'Ожидают'},
+              {id: 'IN_PROGRESS', name: 'В работе'},
+              {id: 'REACTION_UPLOADED', name: 'Готово'}
+            ]} 
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        <div className="space-y-6">
-          {/* TOP CREATORS WIDGET */}
-          <div className="bg-white dark:bg-[#1a1f2e] rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
-              <Users size={16} className="text-indigo-500" /> Топ Креаторов
-            </h3>
-            <div className="space-y-5">
-              {creators?.map((creator, idx) => {
-                // Считаем онлайн либо по флагу из сокетов, либо по времени из базы
-                const isOnline = creator.isOnline || (creator.lastActive && (new Date() - new Date(creator.lastActive)) / 60000 < 3);
-                
-                return (
-                  <div key={idx} className="flex items-center justify-between py-1">
-                    <div className="flex items-center gap-3">
-                      {/* ИСПОЛЬЗУЕМ ТОЛЬКО isOnline */}
-                      <div className={`w-2 h-2 rounded-full transition-all duration-500 ${
-                        creator.isOnline 
-                          ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse' 
-                          : 'bg-slate-300 dark:bg-slate-700'
-                      }`} />
-                      
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 tracking-tight">
-                        {creator.name}
-                      </span>
+      {/* TABLE SECTION - Прокрутка на мобилках */}
+      <div className="mt-8 bg-white dark:bg-[#1a1f2e] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto no-scrollbar">
+          <table className="w-full text-left border-collapse min-w-[800px]">
+            <thead>
+              <tr className="bg-slate-50/50 dark:bg-black/20 border-b dark:border-slate-800">
+                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Контент / Канал</th>
+                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Команда</th>
+                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Статус</th>
+                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Дедлайн</th>
+                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Создано</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y dark:divide-slate-800">
+              {filteredTasks.map((task) => (
+                <tr 
+                  key={task.id} 
+                  className={`transition-all duration-700 group ${task.id === highlightedId ? 'bg-blue-500/10' : 'hover:bg-slate-50/50 dark:hover:bg-white/5'}`}
+                >
+                  <td className="p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-20 h-11 rounded-lg overflow-hidden bg-black shrink-0 border dark:border-white/5">
+                        <img src={`/${task.originalVideo.thumbnailPath}`} className="w-full h-full object-cover opacity-60" />
+                        <button 
+                          onClick={() => setActivePreview({ url: `/${task.status === 'REACTION_UPLOADED' ? task.reactionFilePath : task.originalVideo.filePath}`, title: task.originalVideo.title })}
+                          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Play size={14} className="text-white fill-white" />
+                        </button>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black text-blue-600 uppercase tracking-tighter mb-0.5">{task.channel.name}</p>
+                        <h4 className="text-[12px] font-bold text-slate-900 dark:text-white truncate max-w-[200px] uppercase leading-tight">{task.originalVideo.title}</h4>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-lg border dark:border-slate-700">
-                      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 tabular-nums">
-                        {creator.count}
-                      </span>
-                      <Video size={10} className="text-slate-400" />
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-col gap-2">
+                      {/* Менеджер */}
+                      <div className="flex items-center gap-2 group/m">
+                        <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 shrink-0 border border-amber-100 dark:border-amber-800/50 shadow-sm">
+                          <Shield size={12} />
+                        </div>
+                        <Link 
+                          to={`/profile/${task.managerId}`} 
+                          className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-blue-500 transition-colors truncate max-w-[120px] uppercase tracking-tight"
+                        >
+                          {task.manager?.username || '---'}
+                        </Link>
+                      </div>
+
+                      {/* Креатор */}
+                      <div className="flex items-center gap-2 group/c">
+                        <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 shrink-0 border border-blue-100 dark:border-blue-800/50 shadow-sm">
+                          <User size={12} />
+                        </div>
+                        <Link 
+                          to={`/profile/${task.creatorId}`} 
+                          className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-blue-500 transition-colors truncate max-w-[120px] uppercase tracking-tight"
+                        >
+                          {task.creator?.username || '---'}
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-              {!creators?.length && <p className="text-[10px] text-center text-slate-400 font-bold uppercase">Нет данных</p>}
-            </div>
-          </div>
-
-          {/* EFFICIENCY WIDGET */}
-          <div className="bg-blue-600 rounded-3xl p-6 md:p-8 text-white shadow-xl shadow-blue-500/20 relative overflow-hidden group">
-            <Zap className="absolute -right-6 -bottom-6 text-white/10 group-hover:rotate-12 transition-transform duration-700" size={150} />
-            <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">Эффективность</p>
-            <div className="flex items-baseline gap-2 mt-2">
-              <p className="text-5xl font-bold tracking-tighter">
-                {counters.totalTasks ? Math.round((counters.published / counters.totalTasks) * 100) : 0}%
-              </p>
-              <ArrowUpRight size={24} className="text-emerald-300" />
-            </div>
-            <p className="text-[11px] font-medium mt-4 opacity-70">Процент завершенных задач</p>
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: RECENT ACTIVITY */}
-        <div className="lg:col-span-2">
-          <div className="bg-white dark:bg-[#1a1f2e] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm h-full flex flex-col overflow-hidden">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
-               <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Activity size={16} className="text-blue-500" /> Последние события
-               </h3>
-               <span className="text-[9px] font-bold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded uppercase tracking-tighter">Live Feed</span>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {recent.map((task) => (
-                <div key={task.id} className="flex items-center gap-4 p-3 rounded-2xl bg-slate-50/30 dark:bg-slate-900/30 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 transition-all">
-                  <div className="w-10 h-14 rounded-lg overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700">
-                    <img src={`/${task.originalVideo?.thumbnailPath}`} className="w-full h-full object-cover" alt="" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[9px] font-bold uppercase text-blue-500 mb-0.5">{task.channel?.name}</p>
-                    <h4 className="font-semibold text-xs text-slate-900 dark:text-slate-100 truncate uppercase tracking-tight">
-                      {task.originalVideo?.title}
-                    </h4>
-                    <p className="text-[9px] font-medium text-slate-400 mt-1 uppercase">
-                      {new Date(task.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  <div className={`px-2 py-1 rounded-md text-[8px] font-bold uppercase shadow-sm ${
-                    task.status === 'PUBLISHED' ? 'bg-emerald-500 text-white' :
-                    task.status === 'REACTION_UPLOADED' ? 'bg-blue-500 text-white' :
-                    task.status === 'IN_PROGRESS' ? 'bg-amber-500 text-white' :
-                    'bg-slate-400 text-white'
-                  }`}>
-                    {task.status === 'REACTION_UPLOADED' ? 'Проверка' : task.status === 'IN_PROGRESS' ? 'Работа' : task.status}
-                  </div>
-                </div>
+                  </td>
+                  <td className="p-4 text-center">
+                    {getStatusBadge(task.status)}
+                    {task.needsFixing && <div className="mt-1 text-[8px] font-black text-red-500 uppercase animate-pulse">Нужны правки</div>}
+                  </td>
+                  <td className="p-4">
+                    <div className={`flex flex-col ${task.deadline && new Date(task.deadline) < new Date() ? 'text-red-500' : 'text-slate-500'}`}>
+                      <span className="text-[11px] font-black tabular-nums">{formatDate(task.deadline)}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-right tabular-nums text-[11px] font-bold text-slate-400 uppercase">
+                    {formatDate(task.createdAt)}
+                  </td>
+                </tr>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
 
+        {filteredTasks.length === 0 && (
+          <div className="py-24 text-center opacity-30 uppercase text-[10px] font-black tracking-widest">
+            Нет активных задач для отображения
+          </div>
+        )}
       </div>
+
+      {activePreview && (
+        <VideoModal {...activePreview} onClose={() => setActivePreview(null)} />
+      )}
     </div>
   );
 }
 
-function StatCard({ title, value, icon, color }) {
-  const colors = {
-    blue: "text-blue-600 bg-blue-50 dark:bg-blue-900/30 border-blue-100 dark:border-blue-800",
-    amber: "text-amber-600 bg-amber-50 dark:bg-amber-900/30 border-amber-100 dark:border-amber-800",
-    indigo: "text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-800",
-    green: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-100 dark:border-emerald-800",
-  };
-
+function FilterSelect({ icon, value, onChange, options, labelKey = 'name' }) {
   return (
-    <div className="bg-white dark:bg-[#1a1f2e] p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-      <div className="flex flex-col gap-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${colors[color]}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">{title}</p>
-          <p className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white tracking-tighter tabular-nums">{value}</p>
-        </div>
+    <div className="relative group shrink-0">
+      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+        {icon}
       </div>
+      <select 
+        value={value} 
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-white dark:bg-[#1a1f2e] pl-9 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase outline-none focus:border-blue-500 appearance-none cursor-pointer shadow-sm transition-all"
+      >
+        {options.map(opt => (
+          <option key={opt.id} value={opt.id}>{String(opt[labelKey]).toUpperCase()}</option>
+        ))}
+      </select>
+      <ChevronDown size={10} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
     </div>
   );
 }

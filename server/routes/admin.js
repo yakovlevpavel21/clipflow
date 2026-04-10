@@ -3,14 +3,6 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../db');
 const { protect, authorize } = require('../auth');
-const { 
-  startPairing, 
-  stopPairing, 
-  isPairing, 
-  checkBotStatus, 
-  leaveCurrentGroup, 
-  sendToGroup 
-} = require('../telegram');
 
 // Все роуты здесь защищены: только для ADMIN
 router.use(protect, authorize('ADMIN'));
@@ -117,34 +109,24 @@ router.post('/settings', async (req, res) => {
   } catch (err) { res.status(500).json({ error: "Ошибка сохранения" }); }
 });
 
-// Telegram: Статус
-router.get('/tg-status', async (req, res) => {
-  const status = await checkBotStatus();
-  res.json({ ...status, isPairing: isPairing() });
-});
-
-// Telegram: Начать привязку
-router.post('/tg-start-pairing', async (req, res) => {
-  const result = await startPairing();
-  if (result.success) res.json({ success: true });
-  else res.status(500).json({ error: result.error });
-});
-
-// Telegram: Сброс группы
-router.post('/tg-reset', async (req, res) => {
+router.get('/dashboard-tasks', protect, authorize('ADMIN'), async (req, res) => {
   try {
-    await leaveCurrentGroup();
-    await prisma.setting.delete({ where: { key: 'tg_group_id' } });
-    res.json({ success: true });
-  } catch (err) { res.json({ success: true }); }
-});
-
-// Telegram: Тестовое сообщение
-router.post('/tg-test', async (req, res) => {
-  try {
-    await sendToGroup("🔔 <b>Тестовое уведомление</b>\nСвязь с Clipsio установлена успешно!");
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const tasks = await prisma.task.findMany({
+      where: {
+        status: { not: 'PUBLISHED' } // Только активные
+      },
+      include: {
+        originalVideo: true,
+        channel: true,
+        creator: { select: { username: true } },
+        manager: { select: { username: true } }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

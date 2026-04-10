@@ -7,6 +7,7 @@ import CreatorPage from './pages/CreatorPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import NotificationsPage from './pages/NotificationsPage';
+import Profile from './pages/Profile';
 import api, { socket } from './api'; // Импортируем наш настроенный сокет
 
 export default function App() {
@@ -47,31 +48,49 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Если пользователь НЕ залогинен */}
+        {/* 1. Если пользователь НЕ залогинен */}
         {!user ? (
           <>
             <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </>
         ) : (
-          /* Если пользователь залогинен */
+          /* 2. Если пользователь залогинен */
           <Route path="/" element={<Layout onLogout={handleLogout} user={user} />}>
-            <Route index element={<Dashboard />} />
             
-            {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
-              <>
-                <Route path="manager" element={<ManagerPage />} />
-              </>
+            {/* ГЛАВНАЯ СТРАНИЦА (Редиректор на основе роли) */}
+            <Route index element={
+              user.role === 'ADMIN' ? <Dashboard /> : 
+              user.role === 'MANAGER' ? <Navigate to="/manager" replace /> : 
+              <Navigate to="/creator" replace />
+            } />
+
+            <Route path="profile/:id" element={<Profile />} />
+
+            {/* ДАШБОРД: Только для ADMIN */}
+            {user.role === 'ADMIN' && (
+              <Route path="dashboard" element={<Dashboard />} />
             )}
 
-            <Route path="creator" element={<CreatorPage />} />
+            {/* МЕНЕДЖЕР: ADMIN и MANAGER */}
+            {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
+              <Route path="manager" element={<ManagerPage />} />
+            )}
+
+            {/* КРЕАТОР: ADMIN и CREATOR (Менеджеры сюда не попадут) */}
+            {(user.role === 'ADMIN' || user.role === 'CREATOR') && (
+              <Route path="creator" element={<CreatorPage />} />
+            )}
             
+            {/* АДМИН-ЦЕНТР: Только для ADMIN */}
             {user.role === 'ADMIN' && (
               <Route path="admin" element={<AdminPage />} />
             )}
 
+            {/* УВЕДОМЛЕНИЯ: Для всех */}
             <Route path="notifications" element={<NotificationsPage />} />
 
+            {/* Если ввели несуществующий путь — кидаем на главную (которая сама сделает редирект) */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         )}
