@@ -5,6 +5,23 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../db');
 const { protect } = require('../auth');
 
+router.get('/me', protect, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, username: true, role: true } // Не тянем пароль
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: "Пользователь удален из системы" });
+    }
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {

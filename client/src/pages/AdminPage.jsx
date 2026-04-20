@@ -1,29 +1,33 @@
 import { useState, useEffect } from 'react';
 import api, { socket } from '../api'; 
-import { Shield, Loader2, Plus, Users, Radio, Settings2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
-// Компоненты
-import AdminUsers from '../components/AdminUsers';
-import AdminChannels from '../components/AdminChannels';
-import AdminSettings from '../components/AdminSettings';
-import UserModal from '../components/UserModal';
+// Компоненты вкладок
+import UsersTab from '../components/admin/UsersTab';
+import ChannelsTab from '../components/admin/ChannelsTab';
+import SettingsTab from '../components/admin/SettingsTab';
+
+// Модалки
+import UserModal from '../components/admin/UserModal';
+import ChannelModal from '../components/admin/ChannelModal';
 import PageStatus from '../components/PageStatus';
 
 export default function AdminPage() {
-  // --- СОСТОЯНИЯ ДАННЫХ ---
   const [activeTab, setActiveTab] = useState('users'); 
   const [users, setUsers] = useState([]);
   const [channels, setChannels] = useState([]);
   const [proxy, setProxy] = useState('');
   
-  // --- ИНТЕРФЕЙС ---
   const [loading, setLoading] = useState(true);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Состояния модалок (вынесены сюда)
   const [userModal, setUserModal] = useState({ open: false, data: null });
+  const [channelModal, setChannelModal] = useState({ open: false, data: null });
+
   const [now, setNow] = useState(new Date());
 
-  // --- ЗАГРУЗКА ДАННЫХ ---
   const fetchData = async () => {
     if (!isInitialLoading) setLoading(true);
     setError(null);
@@ -33,17 +37,12 @@ export default function AdminPage() {
         api.get('/api/channels'),
         api.get('/api/admin/settings')
       ]);
-      
       setUsers(u.data);
       setChannels(c.data);
-      
-      // Ищем прокси в настройках
       const proxySetting = s.data.find(i => i.key === 'proxy_url');
       if (proxySetting) setProxy(proxySetting.value);
-      
     } catch (err) {
-      console.error("Admin fetch error:", err);
-      setError("Не удалось загрузить данные администратора");
+      setError("Ошибка загрузки данных");
     } finally {
       setLoading(false);
       setIsInitialLoading(false);
@@ -52,10 +51,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchData();
-
     const timer = setInterval(() => setNow(new Date()), 60000);
-
-    // Статусы "В сети" в реальном времени
     socket.on('status_change', (data) => {
       setUsers(prev => prev.map(u => 
         u.id === Number(data.userId) 
@@ -63,7 +59,6 @@ export default function AdminPage() {
           : u
       ));
     });
-
     return () => {
       clearInterval(timer);
       socket.off('status_change');
@@ -73,48 +68,23 @@ export default function AdminPage() {
   // --- ЛОГИКА ПОЛЬЗОВАТЕЛЕЙ ---
   const handleSaveUser = async (formData) => {
     try {
-      if (userModal.data) {
-        await api.patch(`/api/admin/users/${userModal.data.id}`, formData);
-      } else {
-        await api.post('/api/admin/users', formData);
-      }
+      if (userModal.data) await api.patch(`/api/admin/users/${userModal.data.id}`, formData);
+      else await api.post('/api/admin/users', formData);
       setUserModal({ open: false, data: null });
       fetchData();
-    } catch (err) {
-      alert(err.response?.data?.error || "Ошибка сохранения");
-    }
+    } catch (err) { alert(err.response?.data?.error || "Ошибка"); }
   };
 
   // --- ЛОГИКА КАНАЛОВ ---
-  const handleAddChannel = async (name) => {
+  const handleSaveChannel = async (formData) => {
     try {
-      await api.post('/api/admin/channels', { name });
+      if (channelModal.data) await api.patch(`/api/admin/channels/${channelModal.data.id}`, formData);
+      else await api.post('/api/admin/channels', formData);
+      setChannelModal({ open: false, data: null });
       fetchData();
-    } catch (err) { alert("Ошибка создания канала"); }
-  };
-
-  const updateChannel = async (id, data) => {
-    // 1. Мгновенно обновляем локальный стейт, чтобы кнопка переключилась
-    setChannels(prev => prev.map(ch => 
-      ch.id === id ? { ...ch, ...data } : ch
-    ));
-
-    try {
-      // 2. Отправляем запрос на сервер
-      await api.patch(`/api/admin/channels/${id}`, data);
     } catch (err) {
-      console.error("Update channel error");
-      // Если сервер выдал ошибку, возвращаем данные из базы для синхронизации
-      fetchData(); 
+      alert(err.response?.data?.error || "Ошибка канала");
     }
-  };
-
-  // --- ЛОГИКА НАСТРОЕК ---
-  const saveProxy = async () => {
-    try {
-      await api.post('/api/admin/settings', { key: 'proxy_url', value: proxy });
-      alert("Настройки прокси сохранены");
-    } catch (err) { alert("Ошибка сохранения прокси"); }
   };
 
   const deleteItem = async (type, id) => {
@@ -123,7 +93,7 @@ export default function AdminPage() {
       const endpoint = type === 'users' ? `/api/admin/users/${id}` : `/api/admin/channels/${id}`;
       await api.delete(endpoint);
       fetchData();
-    } catch (err) { alert("Ошибка при удалении"); }
+    } catch (err) { alert("Ошибка удаления"); }
   };
 
   if (isInitialLoading) return <PageStatus loading={true} error={error} onRetry={fetchData} />;
@@ -131,70 +101,49 @@ export default function AdminPage() {
   return (
     <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter']">
       
-      {/* HEADER */}
-      <header className="pt-10 mb-8 px-1 animate-in fade-in duration-700">
-        <div className="space-y-1">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Админ-центр
-          </h1>
-          <p className="text-sm md:text-base text-slate-500 font-medium leading-relaxed">
-            Управление доступом сотрудников, конфигурация каналов и системные настройки Clipsio.
-          </p>
-        </div>
+      <header className="hidden lg:block pt-10 mb-8 px-1 animate-in fade-in duration-700">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white uppercase tracking-tight">Админ-центр</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">Управление доступом и конфигурация каналов.</p>
       </header>
 
-      {/* TABS (Sticky) */}
-      <div className="sticky top-0 lg:top-0 max-lg:top-[64px] z-40 bg-slate-50/95 dark:bg-[#0a0f1c]/95 backdrop-blur-md -mx-4 px-4 pt-4 pb-4 border-b dark:border-slate-800 transition-all">
-        <div className="flex bg-slate-200/50 dark:bg-slate-900 p-1.5 rounded-2xl gap-1 shadow-inner">
-          <TabBtn 
-            label="Сотрудники" 
-            active={activeTab === 'users'} 
-            onClick={() => setActiveTab('users')} 
-          />
-          <TabBtn 
-            label="Каналы" 
-            active={activeTab === 'channels'} 
-            onClick={() => setActiveTab('channels')} 
-          />
-          <TabBtn 
-            label="Настройки" 
-            active={activeTab === 'settings'} 
-            onClick={() => setActiveTab('settings')} 
-          />
+      {/* TABS */}
+      <div className="sticky top-[64px] lg:top-0 z-[60] bg-white/80 dark:bg-[#1f1f1f]/80 backdrop-blur-md -mx-4 px-4 py-4 border-b border-slate-100 dark:border-[#333333]">
+        <div className="flex bg-slate-100 dark:bg-[#161616] p-1 rounded-xl gap-1 shadow-inner">
+          <TabBtn label="Сотрудники" active={activeTab === 'users'} onClick={() => setActiveTab('users')} />
+          <TabBtn label="Каналы" active={activeTab === 'channels'} onClick={() => setActiveTab('channels')} />
+          <TabBtn label="Настройки" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
         </div>
       </div>
 
-      {/* CONTENT AREA */}
-      <div className={`mt-10 animate-in fade-in slide-in-from-bottom-2 duration-500 ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
+      <div className={`mt-8 ${loading ? 'opacity-40 pointer-events-none' : ''} transition-opacity`}>
         {activeTab === 'users' && (
-          <AdminUsers 
-            users={users} 
-            now={now} 
+          <UsersTab 
+            users={users} now={now} 
             onEdit={(u) => setUserModal({ open: true, data: u })} 
             onDelete={deleteItem}
             onAdd={() => setUserModal({ open: true, data: null })}
           />
         )}
-
         {activeTab === 'channels' && (
-          <AdminChannels 
+          <ChannelsTab 
             channels={channels} 
-            onAdd={handleAddChannel} 
-            onDelete={deleteItem} 
-            onUpdate={updateChannel} 
+            onEdit={(c) => setChannelModal({ open: true, data: c })}
+            onAdd={() => setChannelModal({ open: true, data: null })}
+            onDelete={deleteItem}
           />
         )}
-
         {activeTab === 'settings' && (
-          <AdminSettings 
-            proxy={proxy}
-            setProxy={setProxy}
-            onSaveProxy={saveProxy}
+          <SettingsTab 
+            proxy={proxy} setProxy={setProxy} 
+            onSaveProxy={async () => {
+              await api.post('/api/admin/settings', { key: 'proxy_url', value: proxy });
+              alert("Прокси обновлен");
+            }}
           />
         )}
       </div>
 
-      {/* USER MODAL */}
+      {/* МОДАЛКИ (В самом конце для правильного наложения) */}
       {userModal.open && (
         <UserModal 
           user={userModal.data} 
@@ -202,22 +151,22 @@ export default function AdminPage() {
           onSave={handleSaveUser} 
         />
       )}
+
+      {channelModal.open && (
+        <ChannelModal 
+          channel={channelModal.data} 
+          onClose={() => setChannelModal({ open: false, data: null })} 
+          onSave={handleSaveChannel} 
+        />
+      )}
     </div>
   );
 }
 
-// Унифицированный компонент кнопки вкладок
 function TabBtn({ label, active, onClick }) {
   return (
-    <button 
-      onClick={onClick} 
-      className={`flex-1 h-11 flex items-center justify-center gap-2 rounded-xl text-[13px] font-bold transition-all ${
-        active 
-          ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm' 
-          : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
-      }`}
-    >
-      <span>{label}</span>
+    <button onClick={onClick} className={`flex-1 h-10 rounded-lg text-[13px] font-bold transition-all ${active ? 'bg-white dark:bg-[#262626] text-blue-600 shadow-sm dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+      {label}
     </button>
   );
 }

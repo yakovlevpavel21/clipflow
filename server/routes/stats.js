@@ -4,6 +4,49 @@ const router = express.Router();
 const prisma = require('../db');
 const { protect } = require('../auth');
 
+router.get('/dashboard-summary', protect, async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 1. Общие цифры
+    const [totalPublished, activeQueue, publishedToday] = await Promise.all([
+      prisma.task.count({ where: { status: 'PUBLISHED' } }),
+      prisma.task.count({ where: { status: { not: 'PUBLISHED' } } }),
+      prisma.task.count({ where: { status: 'PUBLISHED', publishedAt: { gte: today } } })
+    ]);
+
+    // 2. Статистика по каналам (Топ-5)
+    const channelStats = await prisma.channel.findMany({
+      include: {
+        _count: {
+          select: { tasks: { where: { status: 'PUBLISHED' } } }
+        }
+      },
+      take: 6
+    });
+
+    // 3. Последние 5 задач
+    const recentTasks = await prisma.task.findMany({
+      take: 5,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        originalVideo: true,
+        channel: true,
+        creator: { select: { username: true } }
+      }
+    });
+
+    res.json({
+      summary: { totalPublished, activeQueue, publishedToday },
+      channels: channelStats.map(c => ({ name: c.name, count: c._count.tasks, thumb: c.thumbnailPath })),
+      recentTasks
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/profile-stats/:userId', protect, async (req, res) => {
   const targetId = parseInt(req.params.userId);
   const { month } = req.query; // Формат: "2023-10" или "all"

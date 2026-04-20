@@ -79,12 +79,14 @@ model PushSubscription {
 model Channel {
   id                  Int      @id @default(autoincrement())
   name                String   @unique
+  youtubeUrl          String?  // Ссылка на канал
+  thumbnailPath       String?  // Путь к сохраненной аватарке
   titlePrefix         String?  @default("")
   descriptionFooter   String?  @default("")
   showOriginalLink    Boolean  @default(true)
   originalLinkPrefix  String?  @default("")
-  tasks              Task[]
-  createdAt          DateTime @default(now())
+  tasks               Task[]
+  createdAt           DateTime @default(now())
 }
 
 // Таблица для глобальных настроек (прокси и т.д.)

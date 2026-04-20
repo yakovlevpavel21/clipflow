@@ -1,85 +1,104 @@
-import { X, Film } from 'lucide-react';
-import { useEffect } from 'react';
+import { X, Film, PlayCircle, CheckCircle2, AlertCircle, FileX } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 
 export default function VideoModal({ url, title, channel, onClose }) {
-  
+  const [hasError, setHasError] = useState(false);
+
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'unset'; };
+
+    // МЕНЯЕМ ЦВЕТ СТАТУС-БАРА на глубокий черный
+    const originalThemeColor = document.querySelector('meta[name="theme-color"]')?.getAttribute('content');
+    let themeMeta = document.querySelector('meta[name="theme-color"]');
+    
+    if (!themeMeta) {
+      themeMeta = document.createElement('meta');
+      themeMeta.name = 'theme-color';
+      document.head.appendChild(themeMeta);
+    }
+    themeMeta.setAttribute('content', '#000000'); 
+
+    return () => {
+      document.body.style.overflow = '';
+      if (originalThemeColor) themeMeta.setAttribute('content', originalThemeColor);
+    };
   }, []);
 
   if (!url) return null;
 
-  // ФУНКЦИЯ КОРРЕКЦИИ ПУТИ:
-  // 1. Заменяет все обратные слэши \ на прямые / (важно для iOS)
-  // 2. Убирает двойные слэши //
-  // 3. Делает путь абсолютным
+  const videoType = useMemo(() => {
+    if (url.includes('/originals/')) return { label: 'Оригинал', color: 'text-slate-400 bg-slate-400/10 border-slate-400/20' };
+    return { label: 'Результат', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' };
+  }, [url]);
+
   const getCleanUrl = (rawUrl) => {
-    let cleanPath = rawUrl.replace(/\\/g, '/'); // Фикс слэшей Windows
-    if (!cleanPath.startsWith('/') && !cleanPath.startsWith('http')) {
-      cleanPath = '/' + cleanPath;
-    }
-    // Если это относительный путь, добавляем домен
-    return cleanPath.startsWith('http') ? cleanPath : window.location.origin + cleanPath;
+    let cleanPath = rawUrl.replace(/\\/g, '/');
+    return cleanPath.startsWith('http') ? cleanPath : window.location.origin + (cleanPath.startsWith('/') ? '' : '/') + cleanPath;
   };
 
-  const fullUrl = getCleanUrl(url);
-
   return (
-    <div className="fixed inset-0 w-screen h-screen z-[100000] flex items-center justify-center p-2 sm:p-6 overflow-hidden">
-      {/* Фон */}
-      <div 
-        className="absolute inset-0 bg-slate-950/95 backdrop-blur-xl"
-        onClick={onClose}
-      />
-
-      <div className="relative w-full max-w-5xl h-fit flex flex-col gap-2 md:gap-4 animate-in fade-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 w-screen h-screen z-[100000] flex items-center justify-center p-3 md:p-6 overflow-hidden bg-black/80 backdrop-blur-[2px]">
+      
+      {/* КОНТЕЙНЕР: Ограничен по высоте, чтобы в landscape не вылезать за экран */}
+      <div className="relative w-full max-w-5xl max-h-full flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200">
         
-        {/* ИНФО-СТРОКА */}
-        <div className="flex items-center justify-between px-1">
+        {/* ИНФО-БЛОК */}
+        <div className="flex items-start justify-between px-1 shrink-0">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5 md:mb-1">
-              <span className="bg-blue-600 text-[9px] font-bold px-1.5 py-0.5 rounded text-white uppercase tracking-wider shrink-0">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              {/* Канал */}
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 border border-blue-500/30 rounded text-blue-400 text-[10px] font-black uppercase tracking-wider">
+                <PlayCircle size={10} />
                 {channel || 'Clipsio'}
-              </span>
-              <span className="hidden xs:flex text-[9px] text-slate-500 font-bold uppercase tracking-widest items-center gap-1">
-                <Film size={10} /> Player
-              </span>
+              </div>
+              {/* Тип */}
+              <div className={`flex items-center gap-1.5 px-2 py-0.5 border rounded text-[10px] font-black uppercase tracking-wider ${videoType.color}`}>
+                {videoType.label === 'Результат' ? <CheckCircle2 size={10} /> : <Film size={10} />}
+                {videoType.label}
+              </div>
             </div>
-            <h2 className="text-[11px] md:text-sm font-medium text-white/90 truncate uppercase">
+            <h2 className="text-sm md:text-base font-bold text-white leading-tight truncate">
               {title}
             </h2>
           </div>
 
+          {/* Кнопка закрытия: Контрастная с подложкой */}
           <button 
             onClick={onClose}
-            className="ml-4 p-2 bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white border border-white/5 active:scale-90"
+            className="ml-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white border border-white/10 transition-all active:scale-90"
           >
-            <X size={18} />
+            <X size={24} />
           </button>
         </div>
 
-        {/* ПЛЕЕР */}
-        <div className="relative w-full mx-auto aspect-video max-h-[calc(100vh-120px)] bg-black rounded-xl md:rounded-[2rem] overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center">
-          <video 
-            key={fullUrl} // Заставляет плеер перезагрузиться при смене URL
-            src={fullUrl} 
-            className="w-full h-full object-contain"
-            controls 
-            autoPlay
-            muted // КРИТИЧНО ДЛЯ IOS
-            playsInline // КРИТИЧНО ДЛЯ IOS
-            preload="auto"
-          >
-            {/* Дополнительный фоллбек для типов файлов */}
-            <source src={fullUrl} type="video/mp4" />
-            Ваш браузер не поддерживает видео.
-          </video>
+        {/* ПЛЕЕР С ОБРАБОТКОЙ ОШИБКИ */}
+        <div className="w-full flex justify-center items-center overflow-hidden">
+          <div className="w-full aspect-video bg-[#0a0a0a] rounded-xl md:rounded-2xl overflow-hidden shadow-2xl border border-white/5 flex items-center justify-center relative">
+            
+            {hasError ? (
+              // ЭКРАН ОШИБКИ
+              <div className="flex flex-col items-center justify-center text-center p-6 animate-in fade-in zoom-in-95">
+                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 border border-red-500/20">
+                  <FileX className="text-red-500" size={32} />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Файл не найден</h3>
+                <p className="text-slate-500 text-sm max-w-[280px]">
+                  Видео отсутствует на сервере. Обратитесь к администратору или попробуйте загрузить его заново.
+                </p>
+              </div>
+            ) : (
+              // САМ ПЛЕЕР
+              <video 
+                key={url}
+                src={getCleanUrl(url)} 
+                className="w-full h-full object-contain"
+                controls autoPlay playsInline preload="auto"
+                // Если файл не найден или ошибка загрузки:
+                onError={() => setHasError(true)}
+              />
+            )}
+          </div>
         </div>
-
-        <p className="hidden md:block text-center text-[9px] text-slate-600 font-bold uppercase tracking-[0.3em] opacity-50">
-          Clipsio Cinema Mode
-        </p>
       </div>
     </div>
   );

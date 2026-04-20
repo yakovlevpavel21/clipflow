@@ -2,35 +2,44 @@ import { useState, useEffect } from 'react'; // Добавь импорт хук
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import ManagerPage from './pages/ManagerPage';
-import CreatorPage from './pages/CreatorPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import NotificationsPage from './pages/NotificationsPage';
+import ContentPage from './pages/ContentPage';
 import Profile from './pages/Profile';
-import api, { socket } from './api'; // Импортируем наш настроенный сокет
+import api, { socket } from './api';
 
 export default function App() {
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
+  const [isValidating, setIsValidating] = useState(!!localStorage.getItem('token'));
 
-  // ЭТОТ БЛОК ДОЛЖЕН БЫТЬ ВНУТРИ App
   useEffect(() => {
-    if (user && socket) {
-      // Если сокет уже подключен, шлем сразу
-      if (socket.connected) {
-        socket.emit('user_online', user.id);
+    const verifySession = async () => {
+      if (!user) {
+        setIsValidating(false);
+        return;
       }
-      
-      // На случай переподключения (интернет моргнул)
-      socket.on('connect', () => {
-        socket.emit('user_online', user.id);
-      });
 
-      return () => {
-        socket.off('connect');
-      };
-    }
-  }, [user]);
+      try {
+        // Проверяем пользователя на бэкенде
+        const res = await api.get('/api/auth/me');
+        // Если данные изменились (например, роль), обновляем их
+        localStorage.setItem('user', JSON.stringify(res.data));
+        setUser(res.data);
+        
+        // Подключаем сокет после успешной проверки
+        if (socket) socket.emit('user_online', res.data.id);
+
+      } catch (err) {
+        console.error("Session verification failed:", err);
+        handleLogout(); // Если юзера нет в БД или токен неверный — выходим
+      } finally {
+        setIsValidating(false);
+      }
+    };
+
+    verifySession();
+  }, []);
 
   const handleLogin = (userData) => {
     setUser(userData);
@@ -42,55 +51,37 @@ export default function App() {
   const handleLogout = () => {
     localStorage.clear();
     setUser(null);
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
+  if (isValidating) {
+    return (
+      <div className="min-h-screen bg-[#1f1f1f] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  
   return (
     <BrowserRouter>
       <Routes>
-        {/* 1. Если пользователь НЕ залогинен */}
         {!user ? (
           <>
-            <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+            <Route path="/login" element={<LoginPage onLogin={(u) => { setUser(u); window.location.href = '/'; }} />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </>
         ) : (
-          /* 2. Если пользователь залогинен */
           <Route path="/" element={<Layout onLogout={handleLogout} user={user} />}>
-            
-            {/* ГЛАВНАЯ СТРАНИЦА (Редиректор на основе роли) */}
-            <Route index element={
-              user.role === 'ADMIN' ? <Dashboard /> : 
-              user.role === 'MANAGER' ? <Navigate to="/manager" replace /> : 
-              <Navigate to="/creator" replace />
-            } />
+            {/* ГЛАВНАЯ: теперь доступна всем без Navigate */}
+            <Route index element={<Dashboard />} />
 
             <Route path="profile/:id" element={<Profile />} />
-
-            {/* ДАШБОРД: Только для ADMIN */}
-            {user.role === 'ADMIN' && (
-              <Route path="dashboard" element={<Dashboard />} />
-            )}
-
-            {/* МЕНЕДЖЕР: ADMIN и MANAGER */}
-            {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
-              <Route path="manager" element={<ManagerPage />} />
-            )}
-
-            {/* КРЕАТОР: ADMIN и CREATOR (Менеджеры сюда не попадут) */}
-            {(user.role === 'ADMIN' || user.role === 'CREATOR') && (
-              <Route path="creator" element={<CreatorPage />} />
-            )}
+            <Route path="content" element={<ContentPage />} />
             
-            {/* АДМИН-ЦЕНТР: Только для ADMIN */}
-            {user.role === 'ADMIN' && (
-              <Route path="admin" element={<AdminPage />} />
-            )}
-
-            {/* УВЕДОМЛЕНИЯ: Для всех */}
+            {/* Ограничение оставляем только для страницы системных настроек */}
+            {user.role === 'ADMIN' && <Route path="admin" element={<AdminPage />} />}
+            
             <Route path="notifications" element={<NotificationsPage />} />
-
-            {/* Если ввели несуществующий путь — кидаем на главную (которая сама сделает редирект) */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         )}

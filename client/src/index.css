@@ -4,17 +4,23 @@
 
 @layer base {
   body {
-    @apply antialiased transition-colors duration-200 bg-slate-50 dark:bg-[#0a0f1c] text-slate-900 dark:text-slate-100;
+    /* Теперь основной фон везде #1f1f1f */
+    @apply antialiased transition-colors duration-200 bg-[#f9fafb] dark:bg-[#1f1f1f] text-slate-900 dark:text-[#f1f1f1];
   }
 }
 
+
+/* Круговой прогресс для загрузки */
+.download-ring {
+  transition: stroke-dashoffset 0.35s;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
 html, body {
-  /* Запрещаем свайпы назад/вперед в браузере */
   overscroll-behavior-x: none; 
-  /* Убираем прыжки фона (оставляем только вертикальный скролл) */
   overscroll-behavior-y: contain;
-  /* Принудительно задаем фон, чтобы он не был белым при "оттяжке" страницы */
-  @apply bg-slate-50 dark:bg-[#0a0f1c];
+  @apply bg-slate-50 dark:bg-[#1f1f1f];
   height: 100%;
 }
 
@@ -22,24 +28,33 @@ html, body {
   height: 100%;
 }
 
-/* Фикс для мобильного Safari, чтобы контент не "плавал" под пальцем */
 .no-swipe {
   touch-action: pan-y;
 }
 
+/* Скроллбар в стиле YouTube Gray */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   @apply bg-transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 dark:bg-slate-800 rounded-full;
+  @apply bg-slate-200 dark:bg-[#2a2a2a] rounded-full;
 }
 
-/* Убираем стрелочки у input type="number" */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* Убираем стандартное выделение тапов на мобилках */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pull-to-refresh-container {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }

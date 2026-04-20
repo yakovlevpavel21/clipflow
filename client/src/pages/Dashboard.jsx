@@ -1,255 +1,156 @@
-import { useState, useEffect, useMemo } from 'react';
-import api, { socket } from '../api';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import api from '../api';
 import { 
-  Activity, Clock, User, Shield, Play, 
-  CheckCircle2, Loader2, Layers, Users, ChevronDown,
+  BarChart3, Video, Clock, CheckCircle2, 
+  ArrowRight, Users, Trophy, Play, Layers 
 } from 'lucide-react';
-import { Link } from 'react-router-dom'; 
-import VideoModal from '../components/VideoModal';
+import { StatusIcon } from '../components/content/Helpers';
 
 export default function Dashboard() {
-  const [tasks, setTasks] = useState([]);
-  const [channels, setChannels] = useState([]);
-  const [creators, setCreators] = useState([]);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activePreview, setActivePreview] = useState(null);
-  const [highlightedId, setHighlightedId] = useState(null);
-
-  // Фильтры
-  const [filterChannel, setFilterChannel] = useState('all');
-  const [filterCreator, setFilterCreator] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-
-  const fetchData = async () => {
-    try {
-      const [tRes, cRes, uRes] = await Promise.all([
-        api.get('/api/admin/dashboard-tasks'),
-        api.get('/api/channels'),
-        api.get('/api/tasks/creators')
-      ]);
-      setTasks(tRes.data);
-      setChannels(cRes.data);
-      setCreators(uRes.data);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  };
+  const user = JSON.parse(localStorage.getItem('user'));
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchData();
-
-    socket.on('task_updated', (updatedTask) => {
-      setTasks(prev => {
-        if (updatedTask.status === 'PUBLISHED') {
-          return prev.filter(t => t.id !== updatedTask.id);
-        }
-        const exists = prev.find(t => t.id === updatedTask.id);
-        if (exists) {
-          return prev.map(t => t.id === updatedTask.id ? updatedTask : t);
-        }
-        return [updatedTask, ...prev];
-      });
-
-      setHighlightedId(updatedTask.id);
-      setTimeout(() => setHighlightedId(null), 3000);
-    });
-
-    return () => socket.off('task_updated');
+    api.get('/api/stats/dashboard-summary')
+      .then(res => setData(res.data))
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
   }, []);
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(t => {
-      const matchChan = filterChannel === 'all' || t.channelId === Number(filterChannel);
-      const matchUser = filterCreator === 'all' || t.creatorId === Number(filterCreator);
-      const matchStatus = filterStatus === 'all' || t.status === filterStatus;
-      return matchChan && matchUser && matchStatus;
-    });
-  }, [tasks, filterChannel, filterCreator, filterStatus]);
-
-  const formatDate = (date) => {
-    if (!date) return '---';
-    return new Date(date).toLocaleString('ru-RU', {
-      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-    }).replace('.', '');
-  };
-
-  const getStatusBadge = (status) => {
-    const configs = {
-      AWAITING_REACTION: { label: 'Ожидает', color: 'bg-slate-100 text-slate-500' },
-      IN_PROGRESS: { label: 'В работе', color: 'bg-amber-100 text-amber-600' },
-      REACTION_UPLOADED: { label: 'Готово', color: 'bg-emerald-500 text-white' }
-    };
-    const config = configs[status] || configs.AWAITING_REACTION;
-    return <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${config.color}`}>{config.label}</span>;
-  };
-
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" size={32} /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="animate-spin text-blue-600"><Loader2 size={32} /></div>
+    </div>
+  );
 
   return (
-    <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter']">
+    <div className="max-w-6xl mx-auto pb-20 px-4 font-['Inter']">
       
-      {/* HEADER - Тот же стиль */}
-      <header className="pt-10 mb-8 px-1 animate-in fade-in duration-700">
-        <div className="flex flex-row items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Дашборд
-            </h1>
-            <p className="text-sm md:text-base text-slate-500 font-medium leading-relaxed">
-              Централизованное отслеживание активных процессов системы в реальном времени.
-            </p>
-          </div>
-
-          {/* ПЛАШКА LIVE СПРАВА */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-1 md:mt-2">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] leading-none">Live</span>
-          </div>
-        </div>
+      {/* ПРИВЕТСТВИЕ */}
+      <header className="py-8 md:py-12">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+          Привет, {user.username}! 👋
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">
+          Вот что происходит в Clipsio сегодня.
+        </p>
       </header>
 
-      {/* FILTERS - Горизонтальный скролл на мобилках */}
-      <div className="sticky top-0 lg:top-0 max-lg:top-[64px] z-40 bg-slate-50 dark:bg-[#0a0f1c] -mx-4 px-4 border-b dark:border-slate-800 transition-all">
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-4 px-1">
-          <FilterSelect 
-            icon={<Layers size={14}/>} 
-            value={filterChannel} 
-            onChange={setFilterChannel}
-            options={[{id: 'all', name: 'Все каналы'}, ...channels]} 
-          />
-          <FilterSelect 
-            icon={<Users size={14}/>} 
-            value={filterCreator} 
-            onChange={setFilterCreator}
-            options={[{id: 'all', username: 'Все авторы'}, ...creators]} 
-            labelKey="username"
-          />
-          <FilterSelect 
-            icon={<Activity size={14}/>} 
-            value={filterStatus} 
-            onChange={setFilterStatus}
-            options={[
-              {id: 'all', name: 'Все статусы'},
-              {id: 'AWAITING_REACTION', name: 'Ожидают'},
-              {id: 'IN_PROGRESS', name: 'В работе'},
-              {id: 'REACTION_UPLOADED', name: 'Готово'}
-            ]} 
-          />
-        </div>
+      {/* ОСНОВНЫЕ ПОКАЗАТЕЛИ */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+        <StatCard 
+          icon={<CheckCircle2 className="text-emerald-500" />} 
+          label="Опубликовано" 
+          value={data?.summary.totalPublished} 
+          subtext="Всего за время работы"
+        />
+        <StatCard 
+          icon={<Clock className="text-amber-500" />} 
+          label="В очереди" 
+          value={data?.summary.activeQueue} 
+          subtext="Активные задачи"
+        />
+        <StatCard 
+          icon={<Video className="text-blue-500" />} 
+          label="За сегодня" 
+          value={data?.summary.publishedToday} 
+          subtext="Новых видео вышло"
+        />
       </div>
 
-      {/* TABLE SECTION - Прокрутка на мобилках */}
-      <div className="mt-8 bg-white dark:bg-[#1a1f2e] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto no-scrollbar">
-          <table className="w-full text-left border-collapse min-w-[800px]">
-            <thead>
-              <tr className="bg-slate-50/50 dark:bg-black/20 border-b dark:border-slate-800">
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Контент / Канал</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Команда</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Статус</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Дедлайн</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Создано</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y dark:divide-slate-800">
-              {filteredTasks.map((task) => (
-                <tr 
-                  key={task.id} 
-                  className={`transition-all duration-700 group ${task.id === highlightedId ? 'bg-blue-500/10' : 'hover:bg-slate-50/50 dark:hover:bg-white/5'}`}
-                >
-                  <td className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="relative w-20 h-11 rounded-lg overflow-hidden bg-black shrink-0 border dark:border-white/5">
-                        <img src={`/${task.originalVideo.thumbnailPath}`} className="w-full h-full object-cover opacity-60" />
-                        <button 
-                          onClick={() => setActivePreview({ url: `/${task.status === 'REACTION_UPLOADED' ? task.reactionFilePath : task.originalVideo.filePath}`, title: task.originalVideo.title })}
-                          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Play size={14} className="text-white fill-white" />
-                        </button>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[9px] font-black text-blue-600 uppercase tracking-tighter mb-0.5">{task.channel.name}</p>
-                        <h4 className="text-[12px] font-bold text-slate-900 dark:text-white truncate max-w-[200px] uppercase leading-tight">{task.originalVideo.title}</h4>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-col gap-2">
-                      {/* Менеджер */}
-                      <div className="flex items-center gap-2 group/m">
-                        <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 shrink-0 border border-amber-100 dark:border-amber-800/50 shadow-sm">
-                          <Shield size={12} />
-                        </div>
-                        <Link 
-                          to={`/profile/${task.managerId}`} 
-                          className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-blue-500 transition-colors truncate max-w-[120px] uppercase tracking-tight"
-                        >
-                          {task.manager?.username || '---'}
-                        </Link>
-                      </div>
-
-                      {/* Креатор */}
-                      <div className="flex items-center gap-2 group/c">
-                        <div className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 shrink-0 border border-blue-100 dark:border-blue-800/50 shadow-sm">
-                          <User size={12} />
-                        </div>
-                        <Link 
-                          to={`/profile/${task.creatorId}`} 
-                          className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-blue-500 transition-colors truncate max-w-[120px] uppercase tracking-tight"
-                        >
-                          {task.creator?.username || '---'}
-                        </Link>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4 text-center">
-                    {getStatusBadge(task.status)}
-                    {task.needsFixing && <div className="mt-1 text-[8px] font-black text-red-500 uppercase animate-pulse">Нужны правки</div>}
-                  </td>
-                  <td className="p-4">
-                    <div className={`flex flex-col ${task.deadline && new Date(task.deadline) < new Date() ? 'text-red-500' : 'text-slate-500'}`}>
-                      <span className="text-[11px] font-black tabular-nums">{formatDate(task.deadline)}</span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-right tabular-nums text-[11px] font-bold text-slate-400 uppercase">
-                    {formatDate(task.createdAt)}
-                  </td>
-                </tr>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* ЛЕВАЯ КОЛОНКА: КАНАЛЫ И ТОП */}
+        <div className="lg:col-span-1 space-y-8">
+          <section>
+            <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4 flex items-center gap-2">
+              <Layers size={14} /> Каналы
+            </h3>
+            <div className="space-y-2">
+              {data?.channels.map((ch, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-white dark:bg-[#1a1a1a] rounded-xl border border-slate-100 dark:border-[#333333]">
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={ch.thumb ? `/${ch.thumb}` : `https://ui-avatars.com/api/?name=${ch.name}`} 
+                      className="w-8 h-8 rounded-full object-cover" 
+                      alt="" 
+                    />
+                    <span className="text-sm font-semibold dark:text-[#f1f1f1]">{ch.name}</span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-400">{ch.count} видео</span>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </section>
+
+          <div className="p-5 bg-blue-600 rounded-2xl text-white shadow-xl shadow-blue-600/20 relative overflow-hidden group">
+             <Trophy className="absolute -right-2 -bottom-2 w-24 h-24 opacity-10 transform group-hover:scale-110 transition-transform" />
+             <h4 className="text-sm font-bold uppercase tracking-wider opacity-80">Твой профиль</h4>
+             <p className="text-2xl font-black mt-2">Статистика</p>
+             <Link to={`/profile/${user.id}`} className="mt-4 inline-flex items-center gap-2 text-xs font-bold bg-white/20 hover:bg-white/30 p-2 px-4 rounded-lg transition-all">
+                Открыть <ArrowRight size={14} />
+             </Link>
+          </div>
         </div>
 
-        {filteredTasks.length === 0 && (
-          <div className="py-24 text-center opacity-30 uppercase text-[10px] font-black tracking-widest">
-            Нет активных задач для отображения
+        {/* ПРАВАЯ КОЛОНКА: ПОСЛЕДНИЕ ЗАДАЧИ */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em] flex items-center gap-2">
+              <Play size={14} /> Свежая активность
+            </h3>
+            <button 
+              onClick={() => navigate('/content')}
+              className="text-[11px] font-bold text-blue-500 uppercase hover:underline flex items-center gap-1"
+            >
+              Весь контент <ArrowRight size={14} />
+            </button>
           </div>
-        )}
-      </div>
 
-      {activePreview && (
-        <VideoModal {...activePreview} onClose={() => setActivePreview(null)} />
-      )}
+          <div className="space-y-3">
+            {data?.recentTasks.map(task => (
+              <div key={task.id} className="flex items-center gap-4 p-3 bg-white dark:bg-[#1a1a1a] rounded-2xl border border-slate-100 dark:border-[#333333] hover:border-blue-500/30 transition-all">
+                <div className="w-20 h-12 rounded-lg overflow-hidden shrink-0 bg-black">
+                   <img src={`/${task.originalVideo.thumbnailPath}`} className="w-full h-full object-cover opacity-60" alt="" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-blue-500 uppercase leading-none mb-1">{task.channel.name}</p>
+                  <h4 className="text-sm font-medium text-slate-900 dark:text-[#f1f1f1] truncate">{task.originalVideo.title}</h4>
+                  <div className="flex items-center gap-2 mt-1">
+                     <StatusIcon task={task} size={12} />
+                     <span className="text-[10px] text-slate-400 font-medium">
+                       {task.creator?.username || 'Без автора'} • {new Date(task.updatedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                     </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
 
-function FilterSelect({ icon, value, onChange, options, labelKey = 'name' }) {
+function StatCard({ icon, label, value, subtext }) {
   return (
-    <div className="relative group shrink-0">
-      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-        {icon}
+    <div className="p-6 bg-white dark:bg-[#1a1a1a] rounded-2xl border border-slate-100 dark:border-[#333333] shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 bg-slate-50 dark:bg-[#262626] rounded-xl">
+          {icon}
+        </div>
+        <span className="text-[11px] font-black uppercase text-slate-400 tracking-widest">{label}</span>
       </div>
-      <select 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-white dark:bg-[#1a1f2e] pl-9 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase outline-none focus:border-blue-500 appearance-none cursor-pointer shadow-sm transition-all"
-      >
-        {options.map(opt => (
-          <option key={opt.id} value={opt.id}>{String(opt[labelKey]).toUpperCase()}</option>
-        ))}
-      </select>
-      <ChevronDown size={10} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+      <div className="space-y-0.5">
+        <p className="text-3xl font-bold dark:text-white tabular-nums">{value || 0}</p>
+        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tight opacity-60">{subtext}</p>
+      </div>
     </div>
   );
 }
+
+const Loader2 = ({ size }) => <BarChart3 size={size} className="animate-pulse" />;

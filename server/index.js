@@ -74,7 +74,8 @@ setInterval(async () => {
 
 // ПОДКЛЮЧЕНИЕ РОУТОВ
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/tasks', require('./routes/tasks')(io)); 
+app.use('/api/tasks/notifications', require('./routes/notifications')(io));
+app.use('/api/tasks', require('./routes/tasks')(io));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/stats', require('./routes/stats'));
 
