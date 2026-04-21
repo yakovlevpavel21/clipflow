@@ -39,3 +39,11 @@ jobs:
             cd ../client
             npm install
             npm run build
+            
+            # Удаляем всё старое принудительно
+            sudo rm -rf /var/www/clipsio/*
+            # Копируем новое
+            sudo cp -r dist/* /var/www/clipsio/
+            # Устанавливаем права, чтобы Nginx (пользователь www-data) мог читать файлы
+            sudo chown -R www-data:www-data /var/www/clipsio
+            sudo chmod -R 755 /var/www/clipsio
