@@ -15,25 +15,27 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            set -e # Остановить скрипт при любой ошибке
+            
             cd ~/clipsio
-            git pull origin main
+            
+            # Принудительно обновляем код, игнорируя локальные изменения на сервере
+            git fetch origin main
+            git reset --hard origin/main
             
             # Backend
             cd server
             npm install
             npx prisma generate
+            
+            # Если миграции застряли, 'migrate deploy' может упасть. 
+            # В этом случае один раз нужно будет починить вручную (см. ниже)
             npx prisma migrate deploy
-            pm2 restart index.js || pm2 start index.js --name "clipsio-api"
+            
+            # Перезапуск API. Рекомендую использовать имя процесса, а не файл
+            pm2 restart clipsio-api || pm2 start index.js --name "clipsio-api"
             
             # Frontend
             cd ../client
             npm install
             npm run build
-            
-            # Очищаем папку, которую раздает Nginx
-            sudo rm -rf /var/www/clipsio/*
-            # Копируем свежий билд из папки проекта в папку Nginx
-            sudo cp -r dist/* /var/www/clipsio/
-            
-            # (Опционально) Перезапускаем Nginx, чтобы сбросить кеш
-            sudo systemctl restart nginx
