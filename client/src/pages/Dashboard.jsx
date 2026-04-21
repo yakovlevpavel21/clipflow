@@ -3,38 +3,49 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 import { 
   BarChart3, Video, Clock, CheckCircle2, 
-  ArrowRight, Users, Trophy, Play, Layers 
+  ArrowRight, Users, Trophy, Play, Layers, Loader2 
 } from 'lucide-react';
 import { StatusIcon } from '../components/content/Helpers';
+import PageStatus from '../components/PageStatus';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const user = JSON.parse(localStorage.getItem('user'));
   const navigate = useNavigate();
 
-  useEffect(() => {
+  // Выносим логику в отдельную функцию
+  const fetchData = () => {
+    setLoading(true);
+    setError(null);
     api.get('/api/stats/dashboard-summary')
       .then(res => setData(res.data))
-      .catch(err => console.error(err))
+      .catch(err => {
+        console.error(err);
+        setError("Не удалось загрузить сводку данных");
+      })
       .finally(() => setLoading(false));
+  };
+
+  // Вызываем при первом рендере
+  useEffect(() => {
+    fetchData();
   }, []);
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="animate-spin text-blue-600"><Loader2 size={32} /></div>
-    </div>
-  );
+  // Теперь fetchData доступна для PageStatus
+  if (loading || error) {
+    return <PageStatus loading={loading} error={error} onRetry={fetchData} />;
+  }
 
   return (
     <div className="max-w-6xl mx-auto pb-20 px-4 font-['Inter']">
-      
       {/* ПРИВЕТСТВИЕ */}
       <header className="py-8 md:py-12">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
           Привет, {user.username}! 👋
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           Вот что происходит в Clipsio сегодня.
         </p>
       </header>
@@ -63,7 +74,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* ЛЕВАЯ КОЛОНКА: КАНАЛЫ И ТОП */}
+        {/* ЛЕВАЯ КОЛОНКА: КАНАЛЫ */}
         <div className="lg:col-span-1 space-y-8">
           <section>
             <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4 flex items-center gap-2">
@@ -80,7 +91,7 @@ export default function Dashboard() {
                     />
                     <span className="text-sm font-semibold dark:text-[#f1f1f1]">{ch.name}</span>
                   </div>
-                  <span className="text-xs font-bold text-slate-400">{ch.count} видео</span>
+                  <span className="text-xs font-bold text-slate-400">{ch.count}</span>
                 </div>
               ))}
             </div>
@@ -122,7 +133,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2 mt-1">
                      <StatusIcon task={task} size={12} />
                      <span className="text-[10px] text-slate-400 font-medium">
-                       {task.creator?.username || 'Без автора'} • {new Date(task.updatedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                       {task.creator?.username || 'Система'} • {new Date(task.updatedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                      </span>
                   </div>
                 </div>
@@ -130,7 +141,6 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -152,5 +162,3 @@ function StatCard({ icon, label, value, subtext }) {
     </div>
   );
 }
-
-const Loader2 = ({ size }) => <BarChart3 size={size} className="animate-pulse" />;

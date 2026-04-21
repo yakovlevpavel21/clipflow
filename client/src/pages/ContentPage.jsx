@@ -12,6 +12,7 @@ import BottomSheet from '../components/content/BottomSheet';
 import TaskHistoryModal from '../components/content/TaskHistoryModal';
 
 // Модалки
+import PageStatus from '../components/PageStatus';
 import UploadModal from '../components/UploadModal';
 import VideoModal from '../components/VideoModal';
 import AddTaskModal from '../components/AddTaskModal';
@@ -31,6 +32,7 @@ export default function ContentPage() {
   const [hasMore, setHasMore] = useState(true);
   const [highlightedId, setHighlightedId] = useState(null);
   const [activeDropdownId, setActiveDropdownId] = useState(null);
+  const [error, setError] = useState(null);
 
   // Стейты для Pull-to-Refresh
   const [pullDistance, setPullDistance] = useState(0);
@@ -58,7 +60,7 @@ export default function ContentPage() {
       const res = await api.get('/api/tasks/content', { params: { skip, take: 20, ...filters } });
       setTasks(prev => reset ? res.data : [...prev, ...res.data]);
       setHasMore(res.data.length === 20);
-    } catch (e) { console.error(e); }
+    } catch (e) { setError("Не удалось загрузить контент"); console.log(e);}
     finally {
       setIsInitialLoading(false);
       setIsRefreshing(false);
@@ -229,7 +231,13 @@ export default function ContentPage() {
     if (node) observer.current.observe(node);
   }, [isFetchingMore, hasMore, tasks.length]);
 
-  if (isInitialLoading) return <div className="flex justify-center py-20 bg-white dark:bg-[#1f1f1f] min-h-screen text-blue-500"><Loader2 className="animate-spin" size={32} /></div>;
+  if (isInitialLoading) {
+    return <PageStatus loading={true} />;
+  }
+
+  if (error) {
+    return <PageStatus error={error} onRetry={() => loadData(0, true)} />;
+  } 
 
   return (
     <div 

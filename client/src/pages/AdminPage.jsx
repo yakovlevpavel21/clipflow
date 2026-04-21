@@ -29,21 +29,28 @@ export default function AdminPage() {
   const [now, setNow] = useState(new Date());
 
   const fetchData = async () => {
-    if (!isInitialLoading) setLoading(true);
+    // Включаем загрузку и сбрасываем ошибки (важно для работы кнопки "Повторить")
+    setIsInitialLoading(true);
+    setLoading(true);
     setError(null);
+
     try {
       const [u, c, s] = await Promise.all([
         api.get('/api/admin/users'),
         api.get('/api/channels'),
         api.get('/api/admin/settings')
       ]);
+      
       setUsers(u.data);
       setChannels(c.data);
+      
       const proxySetting = s.data.find(i => i.key === 'proxy_url');
       if (proxySetting) setProxy(proxySetting.value);
     } catch (err) {
-      setError("Ошибка загрузки данных");
+      console.error("Admin fetch error:", err);
+      setError("Не удалось загрузить данные администратора");
     } finally {
+      // Выключаем все индикаторы загрузки
       setLoading(false);
       setIsInitialLoading(false);
     }
@@ -96,7 +103,15 @@ export default function AdminPage() {
     } catch (err) { alert("Ошибка удаления"); }
   };
 
-  if (isInitialLoading) return <PageStatus loading={true} error={error} onRetry={fetchData} />;
+  if (isInitialLoading || error) {
+    return (
+      <PageStatus 
+        loading={isInitialLoading} 
+        error={error} 
+        onRetry={fetchData} 
+      />
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter']">

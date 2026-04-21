@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo, forwardRef } from 'reac
 import { useNavigate } from 'react-router-dom';
 import { getNotifications, getPreferences, updatePreferences, markNotificationsRead, socket, subscribeUserToPush } from '../api';
 import { Bell, BellOff, ShieldAlert, CheckCircle2, Loader2, Video, Inbox } from 'lucide-react';
+import PageStatus from '../components/PageStatus';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -9,6 +10,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
   const observer = useRef();
   const hasMarkedRead = useRef(false);
@@ -31,6 +33,8 @@ export default function NotificationsPage() {
   }, []);
 
   const loadInitialData = async () => {
+    setLoading(true); // Включаем загрузку (важно для Retry)
+    setError(null);   // Сбрасываем старую ошибку
     try {
       const [notifsRes, prefsRes] = await Promise.all([
         getNotifications(0, 20), 
@@ -46,8 +50,12 @@ export default function NotificationsPage() {
         socket.emit('notif_read_locally');
         hasMarkedRead.current = true;
       }
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) { 
+      setError("Не удалось загрузить уведомления"); 
+      console.error(e); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const fetchMore = async () => {
@@ -57,7 +65,7 @@ export default function NotificationsPage() {
       const res = await getNotifications(notifications.length, 20);
       setNotifications(prev => [...prev, ...res.data]);
       setHasMore(res.data.length === 20);
-    } catch (e) { console.error(e); }
+    } catch (e) { setError("Не удалось загрузить уведомления"); console.error(e); }
     finally { setIsFetching(false); }
   };
 
@@ -91,11 +99,15 @@ export default function NotificationsPage() {
     return groups;
   }, {});
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[400px] text-blue-500">
-      <Loader2 className="animate-spin" size={32} />
-    </div>
-  );
+  if (loading || error) {
+    return (
+      <PageStatus 
+        loading={loading} 
+        error={error} 
+        onRetry={loadInitialData} 
+      />
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto pb-24 px-4 font-['Inter']">

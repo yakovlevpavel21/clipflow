@@ -7,7 +7,7 @@ export default function PageStatus({ loading, error, onRetry }) {
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 animate-in fade-in duration-500">
         <Loader2 className="animate-spin text-blue-600" size={42} strokeWidth={2} />
         <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-          Загрузка системы...
+          Загрузка...
         </span>
       </div>
     );

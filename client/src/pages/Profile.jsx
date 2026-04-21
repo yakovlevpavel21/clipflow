@@ -11,6 +11,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
+import PageStatus from '../components/PageStatus';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 
@@ -21,6 +22,7 @@ export default function Profile() {
   const [data, setData] = useState(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [activeRoleTab, setActiveRoleTab] = useState('creator');
@@ -40,20 +42,28 @@ export default function Profile() {
   };
 
   const fetchStats = async () => {
+    // ВАЖНО ДЛЯ RETRY: Если была ошибка, возвращаем полный лоадер
+    if (error) setIsInitialLoading(true);
+    
+    // Сбрасываем старую ошибку и включаем индикатор обновления
+    setError(null);
     if (!isInitialLoading) setIsRefreshing(true);
+
     try {
       const res = await api.get(`/api/stats/profile-stats/${id}?month=${selectedMonth}`);
       setData(res.data);
       
-      // Логика для Админа: если роль ADMIN, принудительно ставим вкладку менеджера
+      // Логика для Админа
       if (res.data.user.role === 'ADMIN') {
         setActiveRoleTab('manager');
       } else if (isInitialLoading && res.data.creator.total === 0 && res.data.manager.total > 0) {
         setActiveRoleTab('manager');
       }
     } catch (e) {
+      setError("Не удалось загрузить данные профиля");
       console.error(e);
     } finally {
+      // Выключаем все состояния загрузки
       setIsInitialLoading(false);
       setIsRefreshing(false);
     }
@@ -85,12 +95,15 @@ export default function Profile() {
   // Скрываем переключатель, если это админ
   const showRoleSwitcher = data?.user.role !== 'ADMIN' && (data?.creator.total > 0 && data?.manager.total > 0);
 
-  if (isInitialLoading) return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-      <Loader2 className="animate-spin text-blue-500" size={32} />
-      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Загрузка аналитики...</p>
-    </div>
-  );
+  if (isInitialLoading || error) {
+    return (
+      <PageStatus 
+        loading={isInitialLoading} 
+        error={error} 
+        onRetry={fetchStats} 
+      />
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter'] transition-colors duration-300">

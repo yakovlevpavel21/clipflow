@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'; // Добавь импорт хуков
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import PageStatus from './components/PageStatus';
 import Dashboard from './pages/Dashboard';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
@@ -56,8 +57,8 @@ export default function App() {
 
   if (isValidating) {
     return (
-      <div className="min-h-screen bg-[#1f1f1f] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#1f1f1f]">
+        <PageStatus loading={true} />
       </div>
     );
   }
