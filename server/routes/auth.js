@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const prisma = require('../db');
 const { protect } = require('../auth');
 
@@ -26,9 +27,12 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { username } });
-    if (!user || user.password !== password) {
+    
+    // Сравниваем введенный пароль с хешем из базы
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
+
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET,

@@ -1,33 +1,22 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Удаляем старые данные (опционально, если хочешь полную очистку)
-  // await prisma.task.deleteMany();
-  // await prisma.channel.deleteMany();
-
-  const admin = await prisma.user.upsert({
+  const hashedPassword = await bcrypt.hash('admin', 10);
+  
+  await prisma.user.upsert({
     where: { username: 'admin' },
-    update: {
-      password: 'admin', // Дефолтный пароль
-      role: 'ADMIN'
-    },
+    update: {},
     create: {
       username: 'admin',
-      password: 'admin',
-      role: 'ADMIN'
-    }
+      password: hashedPassword, // Теперь тут хеш
+      role: 'ADMIN',
+    },
   });
-
-  console.log('✅ База данных инициализирована!');
-  console.log('Данные для входа: admin / admin');
+  console.log('Seed completed: Admin created');
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => console.error(e))
+  .finally(async () => await prisma.$disconnect());

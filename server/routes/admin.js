@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios'); // для скачивания аватарки
 const execPromise = util.promisify(exec);
+const bcrypt = require('bcrypt');
 
 // Все роуты здесь защищены: только для ADMIN
 router.use(protect, authorize('ADMIN'));
@@ -34,15 +35,30 @@ router.get('/users', async (req, res) => {
 
 router.post('/users', async (req, res) => {
   try {
-    const user = await prisma.user.create({ data: req.body });
+    const { username, password, role, tgUsername } = req.body;
+    
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({ 
+      data: { 
+        username, 
+        password: hashedPassword, 
+        role, 
+        tgUsername 
+      } 
+    });
     res.json(user);
   } catch (err) { res.status(500).json({ error: "Ошибка создания пользователя" }); }
 });
 
 router.patch('/users/:id', async (req, res) => {
   const { password, ...data } = req.body;
-  if (password && password.trim() !== "") data.password = password;
+  
   try {
+    if (password && password.trim() !== "") {
+      data.password = await bcrypt.hash(password, 10);
+    }
+
     const user = await prisma.user.update({
       where: { id: parseInt(req.params.id) },
       data
