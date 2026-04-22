@@ -55,6 +55,7 @@ export default function ContentPage() {
   const navigate = useNavigate(); 
   const location = useLocation();
   const highlightTimerRef = useRef(null);
+  const downloadAbortRef = useRef(null);
 
   const loadData = async (skip = 0, reset = false) => {
     if (reset && tasks.length === 0) setIsInitialLoading(true);
@@ -175,7 +176,7 @@ export default function ContentPage() {
     const path = type === 'original' ? task.originalVideo?.filePath : task.reactionFilePath;
     if (!path) return alert("Файл не найден");
     
-    // Добавляем timestamp к имени, чтобы iOS не путала файлы в кеше
+    // Добавляем timestamp, чтобы iOS не подсовывала старый файл из кеша
     const videoFileName = `${Date.now()}_${task.originalVideo.videoId}.mp4`;
     const url = window.location.origin + getDownloadUrl(path, videoFileName);
     
@@ -184,40 +185,36 @@ export default function ContentPage() {
 
     if (isIOS && isStandalone) {
       setIsDownloading(true);
+      
+      // Создаем новый контроллер для этого скачивания
+      downloadAbortRef.current = new AbortController();
 
-      // Логика подготовки и шаринга
-      const startShare = async () => {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Network error");
+      try {
+        // 1. Загружаем файл с возможностью отмены (signal)
+        const response = await fetch(url, { signal: downloadAbortRef.current.signal });
         const blob = await response.blob();
         const file = new File([blob], videoFileName, { type: 'video/mp4' });
 
+        // 2. Пытаемся вызвать окно "Поделиться"
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file] });
-        } else {
-          throw new Error("Cannot share");
+          setIsDownloading(false);
+          return; 
         }
-      };
-
-      // Предохранитель: если за 9 секунд ничего не случилось, отменяем всё и открываем браузер
-      const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout")), 9000)
-      );
-
-      try {
-        // Запускаем шаринг и таймаут одновременно. Кто быстрее — тот и победил.
-        await Promise.race([startShare(), timeout]);
       } catch (err) {
-        console.error("Share failed or timed out:", err);
-        // Если случился таймаут или ошибка - открываем через _blank + noreferrer
-        // Это вызовет In-App Safari с кнопкой "Готово" (Done)
-        window.open(url, '_blank', 'noreferrer');
-      } finally {
-        setIsDownloading(false);
+        // Если это была ручная отмена пользователем — просто выходим
+        if (err.name === 'AbortError') {
+          console.log("Download cancelled by user");
+          return;
+        }
+        console.log("Share sheet failed, falling back to Browser View");
       }
 
+      // --- ФОЛЛБЕК (если не сработал share) ---
+      setIsDownloading(false);
+      window.open(url, '_blank', 'noreferrer');
     } else {
-      // Обычная логика для ПК и Android
+      // Обычная логика для Android и ПК
       const link = document.createElement('a');
       link.href = url;
       link.download = videoFileName;
@@ -225,6 +222,13 @@ export default function ContentPage() {
       link.click();
       document.body.removeChild(link);
     }
+  };
+
+  const cancelDownload = () => {
+    if (downloadAbortRef.current) {
+      downloadAbortRef.current.abort(); // Прекращаем fetch
+    }
+    setIsDownloading(false); // Закрываем окно лоадера
   };
 
   // 3. Обновление через сокеты
@@ -389,14 +393,23 @@ export default function ContentPage() {
         {isDownloading && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white"
+            className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white p-6"
           >
-            <div className="bg-[#282828] p-8 rounded-3xl flex flex-col items-center gap-4 shadow-2xl border border-white/10">
-              <Loader2 className="animate-spin text-blue-500" size={40} />
-              <div className="text-center">
+            <div className="bg-[#1a1a1a] p-8 rounded-[2rem] flex flex-col items-center gap-6 shadow-2xl border border-white/10 w-full max-w-xs">
+              <Loader2 className="animate-spin text-blue-500" size={48} />
+              
+              <div className="text-center space-y-1">
                 <p className="font-bold uppercase tracking-widest text-xs">Подготовка файла</p>
-                <p className="text-[10px] text-white/40 mt-1 uppercase">Это может занять несколько секунд...</p>
+                <p className="text-[10px] text-white/40 uppercase">Пожалуйста, подождите...</p>
               </div>
+
+              {/* КНОПКА ОТМЕНЫ */}
+              <button 
+                onClick={cancelDownload}
+                className="mt-2 px-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95"
+              >
+                Отменить
+              </button>
             </div>
           </motion.div>
         )}
