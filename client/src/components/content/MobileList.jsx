@@ -50,13 +50,14 @@ const MobileList = ({
         return (
           <div 
             key={task.id} 
-            id={`task-${task.id}`} // ID на самом верхнем контейнере карточки
+            id={`task-${task.id}`}
+            ref={index === tasks.length - 1 ? lastElementRef : null}
             className={`
-              p-4 flex flex-col transition-all duration-500 border-l-4
+              p-4 flex flex-col transition-all duration-500
               ${task.id === highlightedId 
-                ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500/20 z-10 scale-[1.02]' // Сделали чуть крупнее при подсветке
+                ? 'bg-blue-600/15 border-blue-500' 
                 : isNewForMe 
-                  ? 'bg-indigo-50/50 dark:bg-indigo-500/5 border-indigo-500' 
+                  ? 'bg-indigo-500/5 border-indigo-500' 
                   : 'bg-transparent border-transparent'
               }
             `}

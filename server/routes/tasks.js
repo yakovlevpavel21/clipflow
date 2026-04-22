@@ -346,10 +346,24 @@ module.exports = (io) => {
 
   // Удаление
   router.delete('/:id', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
-    try { res.json(await prisma.task.delete({ where: { id: parseInt(req.params.id) } })); }
-    catch (err) { res.status(500).json({ error: err.message }); }
-  });
+    try {
+      const taskId = parseInt(req.params.id);
+      
+      // 1. Сначала удаляем (Prisma вернет удаленный объект)
+      const deletedTask = await prisma.task.delete({
+        where: { id: taskId }
+      });
 
+      // 2. ОПОВЕЩАЕМ ВСЕХ: отправляем ID удаленной задачи
+      io.emit('task_deleted', taskId);
+
+      res.json({ success: true, id: taskId });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Ошибка при удалении задачи" });
+    }
+  });
+  
   // Скачивание файлов
   router.get('/download-file', async (req, res) => {
     const { path: filePath, token, name } = req.query;

@@ -72,16 +72,11 @@ export default function Layout({ onLogout, user }) {
   const filteredMenu = menuItems.filter(item => item.roles.includes(user.role));
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#1f1f1f] text-slate-900 dark:text-[#f1f1f1] transition-colors duration-300 flex flex-col lg:flex-row font-['Inter']">
+    <div className="min-h-screen bg-[#f9fafb] dark:bg-[#1f1f1f] text-slate-900 dark:text-[#f1f1f1] transition-colors duration-300 font-['Inter']">
       
-      {/* MOBILE HEADER - Фиксированная высота 64px */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-[#1f1f1f] border-b border-slate-100 dark:border-[#333333] z-[110] flex items-center justify-between px-4 transform translate-z-0">
-        <button 
-          onClick={() => setIsMenuOpen(true)} 
-          className="p-2 rounded-xl bg-slate-50 dark:bg-[#262626] text-slate-600 dark:text-[#aaaaaa] active:scale-95 transition-all"
-        >
-          <Menu size={24} />
-        </button>
+      {/* MOBILE HEADER - Fixed 64px */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-[#1f1f1f] border-b border-slate-100 dark:border-[#333333] z-[110] flex items-center justify-between px-4">
+        <button onClick={() => setIsMenuOpen(true)} className="p-2 rounded-xl bg-slate-50 dark:bg-[#262626] text-slate-600 dark:text-[#aaaaaa]"><Menu size={24} /></button>
         <h1 className="text-lg font-bold tracking-tight uppercase dark:text-white">{getPageTitle()}</h1>
         <Link to="/notifications" className="relative p-2 text-slate-400">
           <Bell size={24} />
@@ -90,7 +85,7 @@ export default function Layout({ onLogout, user }) {
       </header>
 
       {/* SIDEBAR - Виден только от lg: (1024px) */}
-      <aside className={`fixed lg:sticky top-0 left-0 z-[110] w-72 h-screen bg-white dark:bg-[#1f1f1f] border-r dark:border-[#333333] transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 flex flex-col`}>
+      <aside className={`fixed top-0 left-0 z-[120] w-72 h-screen bg-white dark:bg-[#1f1f1f] border-r border-slate-100 dark:border-[#333333] transition-transform duration-300 lg:translate-x-0 ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex flex-col h-full w-full">
           
           {/* Logo Section */}
@@ -158,16 +153,15 @@ export default function Layout({ onLogout, user }) {
 
       <main className="flex-1 min-w-0">
         <div className={`
-          w-full h-full transition-all
-          ${location.pathname === '/content' 
-            ? 'p-0' // Убираем все отступы для страницы контента
-            : 'p-4 md:p-8 lg:p-10 max-w-6xl mx-auto'
-          }
-          /* Добавляем отступ сверху только для мобилок (до 1150px) под высоту хедера */
-          pt-[64px] min-[1150px]:pt-0 
-          pb-[env(safe-area-inset-bottom)]
+          w-full min-h-screen transition-all
+          /* На десктопе добавляем отступ слева, так как Aside там Fixed */
+          lg:pl-72
+          /* На мобилке добавляем отступ сверху, так как Header там Fixed */
+          pt-16 lg:pt-0
         `}>
-          <Outlet />
+          <div className={`${location.pathname === '/content' ? 'p-0' : 'p-4 md:p-8 lg:p-10 max-w-6xl mx-auto'}`}>
+            <Outlet />
+          </div>
         </div>
       </main>
 

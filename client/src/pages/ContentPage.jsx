@@ -96,36 +96,27 @@ export default function ContentPage() {
 
   // 2. Эффект скролла из уведомлений
   useEffect(() => {
-    const targetTaskId = location.state?.scrollToTaskId;
-    
-    // Если нет ID или данные еще загружаются — выходим
-    if (!targetTaskId || isInitialLoading || tasks.length === 0) return;
+    const taskId = location.state?.scrollToTaskId;
+    if (!taskId || isInitialLoading || tasks.length === 0) return;
 
-    let attempts = 0;
-    const maxAttempts = 10;
-
-    const tryScroll = () => {
-      const element = document.getElementById(`task-${targetTaskId}`);
-      
+    const performScroll = () => {
+      const element = document.getElementById(`task-${taskId}`);
       if (element) {
-        // 1. Скроллим
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // 2. Подсвечиваем
-        triggerHighlight(targetTaskId);
-        
-        // 3. Очищаем состояние навигации ТУТ, когда всё успешно сработало
+        // Скроллим само ОКНО браузера
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+        setHighlightedId(taskId);
         navigate(location.pathname, { replace: true, state: {} });
-      } else if (attempts < maxAttempts) {
-        // Если элемента еще нет в DOM, пробуем еще раз через 100мс
-        attempts++;
-        setTimeout(tryScroll, 100);
+        setTimeout(() => setHighlightedId(null), 3000);
       }
     };
 
-    tryScroll();
-
-  }, [location.state?.scrollToTaskId, isInitialLoading, tasks.length]);
+    // Небольшая задержка, чтобы Safari успел понять новую высоту страницы
+    const timer = setTimeout(performScroll, 500);
+    return () => clearTimeout(timer);
+  }, [location.state?.scrollToTaskId, tasks.length]);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -265,13 +256,21 @@ export default function ContentPage() {
         });
       });
 
-      // Включаем подсветку для обновленной задачи
       triggerHighlight(updatedTask.id);
     };
 
+    const handleTaskDelete = (deletedId) => {
+      setTasks(prev => {
+        const filtered = prev.filter(task => Number(task.id) !== Number(deletedId));
+        return filtered;
+      });
+    };
+
     socket.on('task_updated', handleTaskUpdate);
+    socket.on('task_deleted', handleTaskDelete);
     return () => {
-      socket.off('task_updated');
+      socket.off('task_updated', handleTaskUpdate);
+      socket.off('task_deleted', handleTaskDelete);
       if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     };
   }, [user.id, isAdmin]);

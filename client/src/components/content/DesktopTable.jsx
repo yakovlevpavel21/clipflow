@@ -69,7 +69,7 @@ const DesktopTable = ({
                     e.stopPropagation();
                     api.post(`/api/tasks/${task.id}/claim`).then(() => handleDownload(task, 'original'));
                   }} 
-                  className="w-full h-8 flex items-center justify-center gap-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-black uppercase transition-all shadow-lg"
+                  className="w-full h-8 flex items-center justify-center gap-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-black uppercase transition-all shadow-lg"
                 >
                   <Download size={14} /> <span>Начать работу</span>
                 </button>

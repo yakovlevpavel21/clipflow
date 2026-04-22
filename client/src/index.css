@@ -4,35 +4,25 @@
 
 @layer base {
   body {
-    /* Теперь основной фон везде #1f1f1f */
     @apply antialiased transition-colors duration-200 bg-[#f9fafb] dark:bg-[#1f1f1f] text-slate-900 dark:text-[#f1f1f1];
+    /* Разрешаем нормальный скролл */
+    overflow-x: hidden;
+    min-height: 100vh;
   }
 }
 
-
-/* Круговой прогресс для загрузки */
-.download-ring {
-  transition: stroke-dashoffset 0.35s;
-  transform: rotate(-90deg);
-  transform-origin: 50% 50%;
+html {
+  /* Важно для работы scroll-behavior: smooth и правильного расчета координат */
+  scroll-behavior: smooth;
+  height: -webkit-fill-available;
 }
 
-html, body {
-  overscroll-behavior-x: none; 
-  overscroll-behavior-y: contain;
-  @apply bg-slate-50 dark:bg-[#1f1f1f];
-  height: 100%;
-}
-
+/* Удаляем блокировки с html, body, которые мешали скроллу */
 #root {
-  height: 100%;
+  min-height: 100vh;
 }
 
-.no-swipe {
-  touch-action: pan-y;
-}
-
-/* Скроллбар в стиле YouTube Gray */
+/* Скроллбар */
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
 }
@@ -43,18 +33,12 @@ html, body {
   @apply bg-slate-200 dark:bg-[#2a2a2a] rounded-full;
 }
 
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-/* Убираем стандартное выделение тапов на мобилках */
+/* Убираем синее выделение тапов */
 * {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Фикс для предотвращения системного Pull-to-refresh, чтобы работал наш */
 .pull-to-refresh-container {
   overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
 }
