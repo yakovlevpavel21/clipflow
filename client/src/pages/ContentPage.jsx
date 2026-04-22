@@ -175,56 +175,49 @@ export default function ContentPage() {
     const path = type === 'original' ? task.originalVideo?.filePath : task.reactionFilePath;
     if (!path) return alert("Файл не найден");
     
-    const videoFileName = `${task.originalVideo.videoId}_${type}.mp4`;
+    // Добавляем timestamp к имени, чтобы iOS не путала файлы в кеше
+    const videoFileName = `${Date.now()}_${task.originalVideo.videoId}.mp4`;
     const url = window.location.origin + getDownloadUrl(path, videoFileName);
     
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
 
-    // Если это iPhone и приложение запущено как PWA (на рабочем столе)
     if (isIOS && isStandalone) {
       setIsDownloading(true);
-      
-      // Пытаемся вызвать нативный Share Sheet (самый удобный способ)
-      try {
-        // Ставим лимит на ожидание загрузки (например, 4 секунды)
-        // Если файл качается дольше, iOS может заблокировать окно "Поделиться"
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
+      // Логика подготовки и шаринга
+      const startShare = async () => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Network error");
         const blob = await response.blob();
         const file = new File([blob], videoFileName, { type: 'video/mp4' });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file] });
-          setIsDownloading(false);
-          return; // Если успешно поделились — выходим
+        } else {
+          throw new Error("Cannot share");
         }
+      };
+
+      // Предохранитель: если за 9 секунд ничего не случилось, отменяем всё и открываем браузер
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout")), 9000)
+      );
+
+      try {
+        // Запускаем шаринг и таймаут одновременно. Кто быстрее — тот и победил.
+        await Promise.race([startShare(), timeout]);
       } catch (err) {
-        console.log("Share sheet failed or timeout, falling back to Browser View");
+        console.error("Share failed or timed out:", err);
+        // Если случился таймаут или ошибка - открываем через _blank + noreferrer
+        // Это вызовет In-App Safari с кнопкой "Готово" (Done)
+        window.open(url, '_blank', 'noreferrer');
+      } finally {
+        setIsDownloading(false);
       }
 
-      // --- ФОЛЛБЕК ДЛЯ ПОЯВЛЕНИЯ КНОПОК БРАУЗЕРА ---
-      // Если Share Sheet не сработал или файл слишком большой
-      setIsDownloading(false);
-
-      // Хитрость: window.open с параметром 'noreferrer' и '_blank' 
-      // в PWA на iOS часто вызывает именно In-App Safari с кнопками "Готово" и панелью навигации
-      const win = window.open(url, '_blank', 'noreferrer');
-      
-      // Если всплывающее окно заблокировано
-      if (!win) {
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noreferrer';
-        link.click();
-      }
     } else {
-      // Обычная логика для Android и ПК
+      // Обычная логика для ПК и Android
       const link = document.createElement('a');
       link.href = url;
       link.download = videoFileName;
