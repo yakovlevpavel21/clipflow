@@ -86,7 +86,7 @@ cleanupOldFiles();
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks/notifications', require('./routes/notifications')(io));
 app.use('/api/tasks', require('./routes/tasks')(io));
-app.use('/api/admin', require('./routes/admin'));
+app.use('/api/admin', require('./routes/admin')(io));
 app.use('/api/stats', require('./routes/stats'));
 
 app.get('/api/channels', require('./auth').protect, async (req, res) => {

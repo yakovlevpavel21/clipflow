@@ -9,17 +9,23 @@ const { protect } = require('../auth');
 router.get('/me', protect, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, username: true, role: true } // Не тянем пароль
+      where: { id: req.user.id }
     });
 
-    if (!user) {
-      return res.status(401).json({ error: "Пользователь удален из системы" });
+    if (!user) return res.status(401).json({ error: "Пользователь не найден" });
+
+    // ПРОВЕРКА ВЕРСИИ ПАРОЛЯ
+    const currentPasswordVersion = user.password.slice(-10);
+    
+    // Если "отпечаток" в токене не совпадает с тем, что сейчас в базе
+    if (req.user.pv !== currentPasswordVersion) {
+      console.log(`[Auth] Сессия отклонена: пароль пользователя ${user.username} был изменен.`);
+      return res.status(401).json({ error: "Пароль был изменен. Войдите заново." });
     }
 
-    res.json(user);
+    res.json({ id: user.id, username: user.username, role: user.role });
   } catch (err) {
-    res.status(500).json({ error: "Ошибка сервера" });
+    res.status(401).json({ error: "Ошибка проверки сессии" });
   }
 });
 
@@ -27,17 +33,26 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { username } });
-    
-    // Сравниваем введенный пароль с хешем из базы
+    const bcrypt = require('bcrypt');
+
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
+    // Добавляем в токен "отпечаток" пароля (последние 10 символов хеша)
+    const passwordVersion = user.password.slice(-10);
+
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
+      { 
+        id: user.id, 
+        username: user.username, 
+        role: user.role,
+        pv: passwordVersion // Password Version
+      },
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
+
     res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка сервера' });

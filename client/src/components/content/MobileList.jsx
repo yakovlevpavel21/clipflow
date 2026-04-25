@@ -15,7 +15,6 @@ const MobileList = ({
   setBottomSheetTask, 
   setActivePreview, 
   handleDownload, 
-  lastElementRef 
 }) => {
   
   const handleRowClick = (task) => {
@@ -51,7 +50,6 @@ const MobileList = ({
           <div 
             key={task.id} 
             id={`task-${task.id}`}
-            ref={index === tasks.length - 1 ? lastElementRef : null}
             className={`
               p-4 flex flex-col transition-all duration-500
               ${task.id === highlightedId 

@@ -56,7 +56,7 @@ export default function ContentPage() {
   const location = useLocation();
   const highlightTimerRef = useRef(null);
   const downloadAbortRef = useRef(null);
-
+  
   const loadData = async (skip = 0, reset = false) => {
     if (reset && tasks.length === 0) setIsInitialLoading(true);
     else if (reset) setIsRefreshing(true);
@@ -275,11 +275,19 @@ export default function ContentPage() {
   const lastElementRef = useCallback(node => {
     if (isFetchingMore || !hasMore) return;
     if (observer.current) observer.current.disconnect();
+
     observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) loadData(tasks.length);
+      // Если маяк внизу экрана, подгружаем данные
+      if (entries[0].isIntersecting && hasMore && !isRefreshing) {
+        loadData(tasks.length);
+      }
+    }, {
+      rootMargin: '200px', // Начинаем грузить заранее (за 200px до низа)
+      threshold: 0.1
     });
+
     if (node) observer.current.observe(node);
-  }, [isFetchingMore, hasMore, tasks.length]);
+  }, [isFetchingMore, hasMore, tasks.length, isRefreshing]);
 
   if (isInitialLoading) {
     return <PageStatus loading={true} />;
@@ -321,14 +329,11 @@ export default function ContentPage() {
       </div>
 
       {/* 2. HEADER (Desktop) */}
-      <div className="hidden min-[850px]:block px-4 md:px-8 pt-6 pb-4">
-        <div className="flex items-center justify-between text-slate-900 dark:text-white">
-          <h1 className="text-2xl font-bold tracking-tight uppercase">Контент</h1>
-          {isManager && (
-            <button onClick={() => setAddTaskOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-md font-bold text-xs uppercase flex items-center gap-2 transition-all shadow-lg active:scale-95">
-              <Plus size={18} /> Создать
-            </button>
-          )}
+      <div className="hidden min-[850px]:block px-4 md:px-8 pt-6 pb-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight uppercase text-slate-900 dark:text-white">
+            Контент
+          </h1>
         </div>
       </div>
 
@@ -360,7 +365,7 @@ export default function ContentPage() {
                 setActiveDropdownId={setActiveDropdownId} loadData={loadData}
                 setUploadTarget={setUploadTarget} setEditTarget={setEditTarget}
                 setPublishTarget={setPublishTarget} setActivePreview={setActivePreview}
-                handleDownload={handleDownload} lastElementRef={lastElementRef}
+                handleDownload={handleDownload}
                 setHistoryTarget={setHistoryTarget}
               />
             </div>
@@ -369,14 +374,33 @@ export default function ContentPage() {
                 tasks={tasks} user={user} isManager={isManager} highlightedId={highlightedId}
                 setUploadTarget={setUploadTarget} setEditTarget={setEditTarget}
                 setPublishTarget={setPublishTarget} setBottomSheetTask={setBottomSheetTask}
-                setActivePreview={setActivePreview} lastElementRef={lastElementRef}
+                setActivePreview={setActivePreview}
                 handleDownload={handleDownload}
               />
             </div>
           </div>
         )}
 
-        {isFetchingMore && <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" size={24} /></div>}
+        <div ref={lastElementRef} className="h-20 w-full flex flex-col justify-center items-center gap-2">
+          {isFetchingMore && (
+            <>
+              <Loader2 className="animate-spin text-blue-500" size={24} />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">
+                Загрузка данных
+              </span>
+            </>
+          )}
+          
+          {!hasMore && tasks.length > 0 && (
+            <div className="flex items-center gap-3 opacity-20">
+              <div className="h-px w-8 bg-slate-400" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Конец списка
+              </span>
+              <div className="h-px w-8 bg-slate-400" />
+            </div>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>

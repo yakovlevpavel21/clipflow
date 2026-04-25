@@ -42,6 +42,24 @@ export default function App() {
     verifySession();
   }, []);
 
+  useEffect(() => {
+    if (user && socket) {
+      // Стандартный вход в онлайн
+      socket.emit('user_online', user.id);
+
+      // СЛУШАЕМ СИГНАЛ НА ВЫХОД
+      socket.on('force_logout', (data) => {
+        console.warn("Принудительный выход:", data.reason);
+        alert("Ваш сеанс завершен: пароль был изменен. Войдите снова.");
+        handleLogout(); // Ваша функция очистки localStorage и редиректа
+      });
+
+      return () => {
+        socket.off('force_logout');
+      };
+    }
+  }, [user]);
+
   const handleLogin = (userData) => {
     setUser(userData);
     // window.location.href используется для полной перезагрузки, 
@@ -50,7 +68,10 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    // Удаляем только сессию, не трогаем список аккаунтов
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
     setUser(null);
     window.location.href = '/login';
   };

@@ -18,13 +18,20 @@ api.interceptors.request.use(config => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Если токен невалиден или юзер удален — чистим всё
-      localStorage.clear();
+    // Проверяем, не является ли этот запрос попыткой логина
+    const isLoginRequest = error.config && error.config.url.includes('/api/auth/login');
+
+    if (error.response && error.response.status === 401 && !isLoginRequest) {
+      // Если это НЕ логин, но токен протух — разлогиниваем
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
+    
+    // Возвращаем ошибку дальше, чтобы LoginPage мог её обработать и показать в стейте
     return Promise.reject(error);
   }
 );

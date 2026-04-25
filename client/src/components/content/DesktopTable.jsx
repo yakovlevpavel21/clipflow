@@ -8,7 +8,7 @@ import { StatusBadge, DateInfo, VideoThumbnail } from './Helpers';
 import { Link } from 'react-router-dom';
 
 const DesktopTable = ({
-  tasks, user, isManager, isAdmin, highlightedId, lastElementRef,
+  tasks, user, isManager, isAdmin, highlightedId,
   setUploadTarget, setEditTarget, setPublishTarget, setActivePreview,
   loadData, handleDownload, activeDropdownId, setActiveDropdownId,
   setHistoryTarget

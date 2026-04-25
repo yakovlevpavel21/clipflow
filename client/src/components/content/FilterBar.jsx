@@ -1,9 +1,9 @@
 import { memo } from 'react';
 import { ChevronDown, Layers, Activity, Users, Plus } from 'lucide-react';
 
+// Вспомогательный компонент селектора
 function FilterSelect({ value, onChange, options, labelKey = 'name', icon }) {
   const isActive = value !== 'all';
-  
   return (
     <div className="relative group shrink-0">
       {icon && (
@@ -11,7 +11,6 @@ function FilterSelect({ value, onChange, options, labelKey = 'name', icon }) {
           {icon}
         </div>
       )}
-      
       <select 
         value={value} 
         onChange={(e) => onChange(e.target.value)} 
@@ -29,11 +28,7 @@ function FilterSelect({ value, onChange, options, labelKey = 'name', icon }) {
           </option>
         ))}
       </select>
-
-      <ChevronDown 
-        size={14} 
-        className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isActive ? 'text-blue-500' : 'text-[#aaaaaa]'}`} 
-      />
+      <ChevronDown size={14} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${isActive ? 'text-blue-500' : 'text-[#aaaaaa]'}`} />
     </div>
   );
 }
@@ -42,31 +37,27 @@ const FilterBar = ({ filters, setFilters, channels, creators, isManager, onAddTa
   return (
     <div className="sticky top-[64px] min-[1150px]:top-0 z-[60] h-[56px] flex items-center justify-between gap-4 px-4 md:px-8 bg-white dark:bg-[#1f1f1f] border-b border-slate-200 dark:border-[#333333] transition-colors">
       
+      {/* ЛЕВАЯ ЧАСТЬ: ФИЛЬТРЫ */}
       <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
-        {/* ФИЛЬТР ПО КАНАЛАМ */}
         <FilterSelect 
           icon={<Layers size={14}/>}
           value={filters.channelId} 
           onChange={(v) => setFilters(f => ({...f, channelId: v}))} 
           options={[{id: 'all', name: 'Все каналы'}, ...channels]} 
         />
-
-        {/* ФИЛЬТР ПО СТАТУСАМ */}
         <FilterSelect 
           icon={<Activity size={14}/>}
           value={filters.status} 
           onChange={(v) => setFilters(f => ({...f, status: v}))}
           options={[
             {id: 'all', name: 'Все статусы'},
-            {id: 'AWAITING_REACTION', name: 'Новые'}, // ДОБАВЛЕНО
+            {id: 'AWAITING_REACTION', name: 'Новые'},
             {id: 'IN_PROGRESS', name: 'В работе'},
             {id: 'REACTION_UPLOADED', name: 'На проверке'},
             {id: 'FIXING', name: 'Нужны правки'},
             {id: 'PUBLISHED', name: 'Опубликовано'}
           ]} 
         />
-
-        {/* ФИЛЬТР ПО АВТОРАМ */}
         {isManager && (
           <FilterSelect 
             icon={<Users size={14}/>}
@@ -78,9 +69,17 @@ const FilterBar = ({ filters, setFilters, channels, creators, isManager, onAddTa
         )}
       </div>
 
+      {/* ПРАВАЯ ЧАСТЬ: КНОПКА СОЗДАТЬ */}
       {isManager && (
-        <button onClick={onAddTask} className="min-[850px]:hidden p-2 bg-blue-600 text-white rounded-lg shrink-0">
-          <Plus size={20} />
+        <button 
+          onClick={onAddTask} 
+          className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-3 min-[850px]:px-5 rounded-lg flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-500/20 shrink-0"
+        >
+          <Plus size={18} />
+          {/* Текст виден только на десктопе */}
+          <span className="hidden min-[850px]:inline text-[11px] font-black uppercase tracking-widest">
+            Создать
+          </span>
         </button>
       )}
     </div>
