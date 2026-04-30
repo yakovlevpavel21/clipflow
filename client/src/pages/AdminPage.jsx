@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api, { socket } from '../api'; 
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Компоненты вкладок
 import UsersTab from '../components/admin/UsersTab';
@@ -75,32 +76,54 @@ export default function AdminPage() {
   // --- ЛОГИКА ПОЛЬЗОВАТЕЛЕЙ ---
   const handleSaveUser = async (formData) => {
     try {
-      if (userModal.data) await api.patch(`/api/admin/users/${userModal.data.id}`, formData);
-      else await api.post('/api/admin/users', formData);
+      if (userModal.data) {
+        await api.patch(`/api/admin/users/${userModal.data.id}`, formData);
+        toast.success('Данные сотрудника обновлены');
+      } else {
+        await api.post('/api/admin/users', formData);
+        toast.success('Новый сотрудник создан');
+      }
       setUserModal({ open: false, data: null });
       fetchData();
-    } catch (err) { alert(err.response?.data?.error || "Ошибка"); }
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Ошибка сохранения");
+      throw err; // ВАЖНО: пробрасываем ошибку дальше в модалку
+    }
   };
 
   // --- ЛОГИКА КАНАЛОВ ---
   const handleSaveChannel = async (formData) => {
+    // Убираем только технические поля и аватарку-превью
+    const { id, createdAt, thumbnail, thumbnailPath, ...cleanData } = formData;
+
     try {
-      if (channelModal.data) await api.patch(`/api/admin/channels/${channelModal.data.id}`, formData);
-      else await api.post('/api/admin/channels', formData);
+      if (channelModal.data) {
+        await api.patch(`/api/admin/channels/${id}`, cleanData);
+        toast.success('Канал обновлен');
+      } else {
+        await api.post('/api/admin/channels', cleanData);
+        toast.success('Канал добавлен');
+      }
       setChannelModal({ open: false, data: null });
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.error || "Ошибка канала");
+      toast.error('Ошибка сохранения');
+      throw err;
     }
   };
 
+  // --- ЛОГИКА УДАЛЕНИЯ ---
   const deleteItem = async (type, id) => {
     if (!confirm("Удалить безвозвратно?")) return;
     try {
       const endpoint = type === 'users' ? `/api/admin/users/${id}` : `/api/admin/channels/${id}`;
       await api.delete(endpoint);
+      
+      toast.error(type === 'users' ? 'Сотрудник удален' : 'Канал удален');
       fetchData();
-    } catch (err) { alert("Ошибка удаления"); }
+    } catch (err) { 
+      toast.error("Ошибка при удалении объекта"); 
+    }
   };
 
   if (isInitialLoading || error) {
@@ -122,11 +145,23 @@ export default function AdminPage() {
       </header>
 
       {/* TABS */}
-      <div className="sticky top-[64px] lg:top-0 z-[60] bg-white/80 dark:bg-[#1f1f1f]/80 backdrop-blur-md -mx-4 px-4 py-4 border-b border-slate-100 dark:border-[#333333]">
+      <div className="sticky top-[calc(44px+env(safe-area-inset-top))] lg:top-0 z-[60] bg-[#f9fafb] dark:bg-[#1f1f1f]/80 backdrop-blur-md -mx-4 px-4 py-4 border-b border-slate-100 dark:border-[#333333] transition-all">
         <div className="flex bg-slate-100 dark:bg-[#161616] p-1 rounded-xl gap-1 shadow-inner">
-          <TabBtn label="Сотрудники" active={activeTab === 'users'} onClick={() => setActiveTab('users')} />
-          <TabBtn label="Каналы" active={activeTab === 'channels'} onClick={() => setActiveTab('channels')} />
-          <TabBtn label="Настройки" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+          <TabBtn 
+            label="Сотрудники" 
+            active={activeTab === 'users'} 
+            onClick={() => setActiveTab('users')} 
+          />
+          <TabBtn 
+            label="Каналы" 
+            active={activeTab === 'channels'} 
+            onClick={() => setActiveTab('channels')} 
+          />
+          <TabBtn 
+            label="Настройки" 
+            active={activeTab === 'settings'} 
+            onClick={() => setActiveTab('settings')} 
+          />
         </div>
       </div>
 
@@ -149,10 +184,16 @@ export default function AdminPage() {
         )}
         {activeTab === 'settings' && (
           <SettingsTab 
-            proxy={proxy} setProxy={setProxy} 
+            proxy={proxy} 
+            setProxy={setProxy} 
             onSaveProxy={async () => {
-              await api.post('/api/admin/settings', { key: 'proxy_url', value: proxy });
-              alert("Прокси обновлен");
+              try {
+                await api.post('/api/admin/settings', { key: 'proxy_url', value: proxy });
+                toast.success('Настройки прокси успешно сохранены');
+              } catch (err) {
+                toast.error('Не удалось сохранить конфигурацию прокси');
+                throw err; // Пробрасываем ошибку, чтобы кнопка в SettingsTab разблокировалась
+              }
             }}
           />
         )}

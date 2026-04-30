@@ -107,37 +107,96 @@ module.exports = (io) => {
 
   router.post('/channels', protect, authorize('ADMIN'), async (req, res) => {
     try {
-      const { name, youtubeUrl, thumbnail, ...settings } = req.body;
+      const { 
+        name, 
+        youtubeUrl, 
+        thumbnail, 
+        titlePrefix, 
+        descriptionFooter, 
+        originalLinkPrefix, 
+        showOriginalLink, 
+        publishSlots 
+      } = req.body;
+
+      // Проверка уникальности имени
+      const exists = await prisma.channel.findUnique({ where: { name } });
+      if (exists) return res.status(400).json({ error: "Канал с таким названием уже есть" });
+
       let thumbnailPath = null;
 
+      // Скачивание аватарки
       if (thumbnail && thumbnail.startsWith('http')) {
-        const fileName = `channel_${Date.now()}.jpg`;
-        const filePath = path.join('uploads', fileName);
-        const response = await axios({ url: thumbnail, responseType: 'stream' });
-        const writer = fs.createWriteStream(filePath);
-        response.data.pipe(writer);
-        await new Promise((resolve, reject) => {
-          writer.on('finish', resolve);
-          writer.on('error', reject);
-        });
-        thumbnailPath = `uploads/${fileName}`;
+        try {
+          const dir = path.join(process.cwd(), 'uploads');
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+          const fileName = `channel_${Date.now()}.jpg`;
+          const filePath = path.join(dir, fileName);
+          
+          const response = await axios({ url: thumbnail, responseType: 'stream', timeout: 5000 });
+          const writer = fs.createWriteStream(filePath);
+          response.data.pipe(writer);
+
+          await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+          });
+          thumbnailPath = `uploads/${fileName}`;
+        } catch (e) { console.error("Img download failed"); }
       }
 
+      // Создание в БД
       const channel = await prisma.channel.create({ 
-        data: { name, youtubeUrl, thumbnailPath, ...settings } 
+        data: { 
+          name, 
+          youtubeUrl, 
+          thumbnailPath,
+          titlePrefix: titlePrefix || "",
+          descriptionFooter: descriptionFooter || "",
+          originalLinkPrefix: originalLinkPrefix || "Original: ",
+          showOriginalLink: showOriginalLink ?? true,
+          // Сохраняем слоты как строку (JSON массив)
+          publishSlots: Array.isArray(publishSlots) ? JSON.stringify(publishSlots) : publishSlots
+        } 
       });
+
       res.json(channel);
-    } catch (err) { res.status(500).json({ error: "Ошибка создания канала" }); }
+    } catch (err) {
+      res.status(500).json({ error: `Ошибка создания: ${err.message}` });
+    }
   });
 
   router.patch('/channels/:id', protect, authorize('ADMIN'), async (req, res) => {
     try {
+      const { id } = req.params;
+      const body = req.body;
+
+      // Фильтруем данные: только то, что реально есть в БД
+      const updateData = {};
+      if (body.name !== undefined) updateData.name = body.name;
+      if (body.youtubeUrl !== undefined) updateData.youtubeUrl = body.youtubeUrl;
+      if (body.titlePrefix !== undefined) updateData.titlePrefix = body.titlePrefix;
+      if (body.descriptionFooter !== undefined) updateData.descriptionFooter = body.descriptionFooter;
+      if (body.originalLinkPrefix !== undefined) updateData.originalLinkPrefix = body.originalLinkPrefix;
+      if (body.showOriginalLink !== undefined) updateData.showOriginalLink = Boolean(body.showOriginalLink);
+      
+      // Обработка слотов (если пришел массив - превращаем в строку)
+      if (body.publishSlots !== undefined) {
+        updateData.publishSlots = Array.isArray(body.publishSlots) 
+          ? JSON.stringify(body.publishSlots) 
+          : body.publishSlots;
+      }
+
       const channel = await prisma.channel.update({
-        where: { id: parseInt(req.params.id) },
-        data: req.body
+        where: { id: parseInt(id) },
+        data: updateData
       });
+
       res.json(channel);
-    } catch (err) { res.status(500).json({ error: "Ошибка обновления канала" }); }
+    } catch (err) {
+      console.error("Patch error:", err.message);
+      res.status(500).json({ error: "Ошибка при обновлении настроек" });
+    }
   });
 
   router.delete('/channels/:id', protect, authorize('ADMIN'), async (req, res) => {

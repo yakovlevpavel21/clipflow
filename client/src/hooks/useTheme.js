@@ -1,22 +1,21 @@
 import { useEffect, useState } from 'react';
 
 export function useTheme() {
-  // Устанавливаем начальное состояние из localStorage или дефолт 'dark'
   const [theme, setTheme] = useState(() => {
+    // Получаем начальное значение строго из localStorage
     return localStorage.getItem('theme') || 'dark';
   });
 
   useEffect(() => {
     const root = window.document.documentElement;
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-
+    
+    // Просто переключаем класс для Tailwind
     if (theme === 'dark') {
       root.classList.add('dark');
-      metaThemeColor?.setAttribute('content', '#1a1f2e'); 
     } else {
       root.classList.remove('dark');
-      metaThemeColor?.setAttribute('content', '#ffffff');
     }
+    
     localStorage.setItem('theme', theme);
   }, [theme]);
 

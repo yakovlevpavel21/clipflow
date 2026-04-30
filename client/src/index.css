@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    /* Позволяем JS управлять цветом */
+    background-color: transparent; 
+  }
   body {
     @apply antialiased transition-colors duration-200 bg-[#f9fafb] dark:bg-[#1f1f1f] text-slate-900 dark:text-[#f1f1f1];
     /* Разрешаем нормальный скролл */
@@ -16,10 +20,21 @@ html {
   scroll-behavior: smooth;
   height: -webkit-fill-available;
 }
+html.dark {
+  color-scheme: dark;
+}
 
+html:not(.dark) {
+  color-scheme: light;
+}
 /* Удаляем блокировки с html, body, которые мешали скроллу */
 #root {
   min-height: 100vh;
+}
+
+:root {
+  /* Это заставляет iOS менять цвет текста (время/зарядка) с черного на белый автоматически */
+  color-scheme: light dark; 
 }
 
 /* Скроллбар */
@@ -41,4 +56,39 @@ html {
 /* Фикс для предотвращения системного Pull-to-refresh, чтобы работал наш */
 .pull-to-refresh-container {
   overscroll-behavior-y: contain;
+}
+
+body {
+  /* Убираем любые отступы, чтобы фон body доходил до самых краев */
+  margin: 0;
+  background-color: #f9fafb; /* Цвет по умолчанию */
+}
+
+.dark body {
+  background-color: #1f1f1f;
+}
+
+nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+nav a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+main {
+  height: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Запрещаем иконкам внутри уведомлений наследовать белый/черный цвет текста */
+[data-sonner-toast] [data-icon] svg {
+  color: inherit !important;
+}
+
+/* Дополнительная калибровка для темной темы */
+.dark [data-sonner-toast] {
+  --normal-bg: #1a1a1a !important;
+  --normal-border: #333333 !important;
+  --normal-text: #f1f1f1 !important;
 }

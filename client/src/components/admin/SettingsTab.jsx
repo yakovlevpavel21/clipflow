@@ -1,18 +1,41 @@
-import { useState, memo } from 'react';
-import { Globe, Save, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { useState, memo, useEffect } from 'react';
+import { Globe, Save, ShieldCheck, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const SettingsTab = ({ proxy, setProxy, onSaveProxy }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Сохраняем начальное значение для сравнения
+  const [initialValue, setInitialValue] = useState(proxy);
+
+  // Синхронизируем начальное значение, когда данные загружаются впервые
+  useEffect(() => {
+    if (!initialValue && proxy) {
+      setInitialValue(proxy);
+    }
+  }, [proxy]);
+
+  const isChanged = proxy !== initialValue;
+
+  const handleSave = async () => {
+    if (!isChanged) return;
+    setIsSaving(true);
+    try {
+      await onSaveProxy();
+      setInitialValue(proxy); // После успеха фиксируем новое значение как начальное
+    } catch (err) {
+      // Ошибка в AdminPage
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
-      {/* HEADER */}
       <div className="px-1">
         <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Системная конфигурация</h3>
       </div>
 
-      {/* ОСНОВНАЯ КАРТОЧКА (Во всю ширину) */}
       <div className="bg-white dark:bg-[#1a1a1a] p-6 md:p-10 rounded-2xl border border-slate-100 dark:border-[#333333] shadow-sm space-y-8">
         
         <div className="flex items-center gap-4">
@@ -25,10 +48,7 @@ const SettingsTab = ({ proxy, setProxy, onSaveProxy }) => {
           </div>
         </div>
 
-        {/* СТРОКА ВВОДА И КНОПКА */}
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-end">
-          
-          {/* ГРУППА ИНПУТА */}
           <div className="flex-1 space-y-2.5">
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Адрес прокси (URL)</label>
             <div className="relative">
@@ -49,17 +69,26 @@ const SettingsTab = ({ proxy, setProxy, onSaveProxy }) => {
             </div>
           </div>
 
-          {/* КНОПКА СОХРАНЕНИЯ */}
+          {/* КНОПКА: Фиксированная ширина md:w-[240px] и проверка на изменения */}
           <button 
-            onClick={onSaveProxy} 
-            className="h-14 px-8 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[11px] tracking-[0.2em] rounded-xl transition-all flex items-center justify-center gap-3 shadow-xl shadow-blue-500/20 active:scale-[0.98] shrink-0"
+            onClick={handleSave}
+            disabled={!isChanged || isSaving}
+            className={`h-14 px-8 font-black uppercase text-[11px] tracking-[0.2em] rounded-xl transition-all flex items-center justify-center gap-3 shrink-0 active:scale-[0.98] w-full md:w-[240px] ${
+              !isChanged || isSaving
+                ? 'bg-slate-100 dark:bg-[#262626] text-slate-400 cursor-not-allowed border border-transparent'
+                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/20 border-none'
+            }`}
           >
-            <Save size={18}/> 
-            <span>Сохранить изменения</span>
+            {isSaving ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <Save size={18}/>
+            )}
+            <span>{isSaving ? 'Сохранение...' : 'Сохранить'}</span>
           </button>
         </div>
         
-        {/* ИНФО-БЛОК */}
+        {/* Инфо-блок */}
         <div className="bg-slate-50 dark:bg-[#161616] p-5 rounded-2xl flex gap-4 items-start border border-slate-100 dark:border-[#333333]">
           <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400 shrink-0">
             <ShieldCheck size={20} />
@@ -73,10 +102,6 @@ const SettingsTab = ({ proxy, setProxy, onSaveProxy }) => {
         </div>
 
       </div>
-
-      <p className="text-center text-[9px] text-slate-400 font-bold uppercase tracking-[0.4em] opacity-30">
-        Clipsio Version 1.0.0
-      </p>
     </div>
   );
 };

@@ -19,6 +19,15 @@ const getYouTubeID = (url) => {
   return (match && match[2].length === 11) ? match[2] : null;
 };
 
+const calculatePriority = (task) => {
+  if (task.needsFixing) return 10;
+  if (task.status === 'AWAITING_REACTION') return 20;
+  if (task.status === 'IN_PROGRESS') return 30;
+  if (task.status === 'REACTION_UPLOADED') return 40;
+  if (task.status === 'PUBLISHED') return 50;
+  return 100;
+};
+
 // --- ФУНКЦИЯ ПРОВЕРКИ ФИЗИЧЕСКОГО НАЛИЧИЯ ФАЙЛОВ ---
 const appendFileStatus = (task) => {
   if (!task) return null;
@@ -37,6 +46,15 @@ const appendFileStatus = (task) => {
   };
 };
 
+const parseSlots = (str) => {
+  try {
+    if (!str) return [14, 16, 18, 20];
+    if (typeof str === 'string' && str.startsWith('[')) return JSON.parse(str);
+    if (typeof str === 'string') return str.split(',').map(Number).filter(n => !isNaN(n));
+    return Array.isArray(str) ? str : [14, 16, 18, 20];
+  } catch (e) { return [14, 16, 18, 20]; }
+};
+
 module.exports = (io) => {
 
   // Основной роут контента (используется всеми)
@@ -48,15 +66,31 @@ module.exports = (io) => {
       let where = {};
       if (role === 'MANAGER') where.managerId = userId;
       else if (role === 'CREATOR') where.creatorId = userId;
-      // ADMIN видит всё
 
-      if (channelId && channelId !== 'all') where.channelId = parseInt(channelId);
-      if (status && status !== 'all') {
-        if (status === 'FIXING') where.needsFixing = true;
-        else where.status = status;
+      // ФИЛЬТР КАНАЛОВ (Мультивыбор)
+      if (channelId && channelId !== 'all') {
+        const ids = channelId.split(',').map(id => parseInt(id));
+        where.channelId = { in: ids };
       }
+
+      // ФИЛЬТР СТАТУСОВ (Мультивыбор)
+      if (status && status !== 'all') {
+        const statuses = status.split(',');
+        // Проверяем наличие "FIXING" (наш виртуальный статус)
+        if (statuses.includes('FIXING')) {
+          where.OR = [
+            { status: { in: statuses.filter(s => s !== 'FIXING') } },
+            { needsFixing: true }
+          ];
+        } else {
+          where.status = { in: statuses };
+        }
+      }
+
+      // ФИЛЬТР АВТОРОВ (Мультивыбор)
       if (creatorId && creatorId !== 'all' && (role === 'ADMIN' || role === 'MANAGER')) {
-        where.creatorId = parseInt(creatorId);
+        const ids = creatorId.split(',').map(id => parseInt(id));
+        where.creatorId = { in: ids };
       }
 
       const tasks = await prisma.task.findMany({
@@ -66,11 +100,9 @@ module.exports = (io) => {
           channel: true, 
           creator: { select: { id: true, username: true } } 
         },
-        // Сортируем по плану публикации (новые/будущие сверху)
-        // Если плана нет, используем дату создания как запасной вариант
         orderBy: [
-          { scheduledAt: 'desc' },
-          { createdAt: 'desc' }
+          { sortPriority: 'asc' },
+          { updatedAt: 'desc' } 
         ],
         skip: parseInt(skip),
         take: parseInt(take)
@@ -78,6 +110,70 @@ module.exports = (io) => {
 
       res.json(tasks.map(appendFileStatus));
     } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/next-slot/:channelId', protect, async (req, res) => {
+    try {
+      const { channelId } = req.params;
+      const channel = await prisma.channel.findUnique({ 
+        where: { id: parseInt(channelId) } 
+      });
+
+      if (!channel) return res.status(404).json({ error: "Канал не найден" });
+
+      // 1. Получаем слоты (строго по списку из настроек)
+      const slots = parseSlots(channel.publishSlots).sort((a, b) => a - b);
+      
+      // 2. Ищем время последнего запланированного ролика
+      const lastTask = await prisma.task.findFirst({
+        where: { channelId: parseInt(channelId), scheduledAt: { not: null } },
+        orderBy: { scheduledAt: 'desc' }
+      });
+
+      const now = new Date();
+      const bufferMinutes = 15;
+      const earliestPossible = new Date(now.getTime() + bufferMinutes * 60000);
+      
+      // Точка отсчета для "перебивания" дублей: если есть видео в будущем, 
+      // новый ролик должен быть строго позже него
+      const lastScheduledTime = lastTask ? new Date(lastTask.scheduledAt) : null;
+
+      let resultDate = null;
+      let searchDate = new Date(now);
+      searchDate.setMinutes(0, 0, 0); // Обнуляем для поиска по часам
+
+      // 3. СКАНЕР СЛОТОВ (на 7 дней вперед)
+      // Идем по дням
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        let currentDay = new Date(searchDate);
+        currentDay.setDate(currentDay.getDate() + dayOffset);
+
+        // Проверяем каждый час из заданных слотов в этом дне
+        for (const hour of slots) {
+          let candidate = new Date(currentDay);
+          candidate.setHours(hour, 0, 0, 0);
+
+          // УСЛОВИЯ УСПЕХА:
+          // 1. Слот должен быть в будущем (с учетом 15 мин буфера)
+          const isFutureEnough = candidate >= earliestPossible;
+          
+          // 2. Слот должен быть позже последнего запланированного видео
+          const isAfterLast = !lastScheduledTime || candidate > lastScheduledTime;
+
+          if (isFutureEnough && isAfterLast) {
+            resultDate = candidate;
+            break;
+          }
+        }
+        
+        if (resultDate) break;
+      }
+
+      res.json({ scheduledAt: resultDate || earliestPossible });
+    } catch (err) {
+      console.error("Next slot strict error:", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -182,15 +278,19 @@ module.exports = (io) => {
     try {
       const createdTasks = [];
       for (const t of tasks) {
+        const updatedStatus = 'AWAITING_REACTION';
+        const newPriority = calculatePriority({ status: updatedStatus, needsFixing: false });
+
         const newTask = await prisma.task.create({
           data: {
             originalVideoId: parseInt(originalVideoId),
             channelId: parseInt(t.channelId),
             managerId: parseInt(req.user.id),
             creatorId: t.creatorId ? parseInt(t.creatorId) : null,
-            status: 'AWAITING_REACTION',
+            status: updatedStatus,
             deadline: t.deadline ? new Date(t.deadline) : null,
             scheduledAt: t.scheduledAt ? new Date(t.scheduledAt) : null,
+            sortPriority: newPriority
           },
           include: { originalVideo: true, channel: true, creator: { select: { username: true } } }
         });
@@ -216,13 +316,17 @@ module.exports = (io) => {
     try {
       if (!req.file) return res.status(400).json({ error: "Файл не получен" });
 
+      const updatedStatus = 'REACTION_UPLOADED';
+      const newPriority = calculatePriority({ status: updatedStatus, needsFixing: false });
+
       const fullTask = await prisma.task.update({
         where: { id: parseInt(req.params.id) },
         data: { 
-          status: 'REACTION_UPLOADED', 
+          status: updatedStatus, 
           reactionFilePath: req.file.path.replace(/\\/g, '/'), 
           reactionUploadedAt: new Date(), 
-          needsFixing: false 
+          needsFixing: false,
+          sortPriority: newPriority
         },
         // Убеждаемся, что managerId и данные канала подгружены
         include: { originalVideo: true, channel: true, creator: true, manager: true }
@@ -240,7 +344,7 @@ module.exports = (io) => {
             taskId: fullTask.id, 
             title: "Реакция готова ✅", 
             message: `${req.user.username} сдал(а) видео по каналу ${fullTask.channel.name}`, 
-            type: "REACTION_UPLOADED" 
+            type: updatedStatus 
           }
         });
 
@@ -263,9 +367,16 @@ module.exports = (io) => {
   // Отклонение (Reject)
   router.post('/:id/reject', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
     try {
+      const updatedStatus = 'IN_PROGRESS';
+      const newPriority = calculatePriority({ status: updatedStatus, needsFixing: true });
       const fullTask = await prisma.task.update({
         where: { id: parseInt(req.params.id) },
-        data: { status: 'IN_PROGRESS', needsFixing: true, rejectionReason: req.body.reason },
+        data: { 
+          status: updatedStatus, 
+          needsFixing: true, 
+          rejectionReason: req.body.reason,
+          sortPriority: newPriority
+        },
         include: { creator: true, channel: true, originalVideo: true, manager: true }
       });
       io.emit('task_updated', appendFileStatus(fullTask));
@@ -283,9 +394,18 @@ module.exports = (io) => {
   // Публикация (Publish)
   router.post('/:id/publish', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
     try {
+      const updatedStatus = 'PUBLISHED';
+      const newPriority = calculatePriority({ status: updatedStatus });
       const fullTask = await prisma.task.update({
         where: { id: parseInt(req.params.id) },
-        data: { status: 'PUBLISHED', youtubeUrl: req.body.youtubeUrl, scheduledAt: req.body.scheduledAt ? new Date(req.body.scheduledAt) : null, publishedAt: new Date(), uploaderId: req.user.id },
+        data: { 
+          status: updatedStatus, 
+          youtubeUrl: req.body.youtubeUrl, 
+          scheduledAt: req.body.scheduledAt ? new Date(req.body.scheduledAt) : null, 
+          publishedAt: new Date(),
+          uploaderId: req.user.id,
+          sortPriority: newPriority
+        },
         include: { originalVideo: true, channel: true, creator: true, manager: true }
       });
       io.emit('task_updated', appendFileStatus(fullTask));
@@ -303,12 +423,15 @@ module.exports = (io) => {
   router.post('/:id/claim', protect, authorize('CREATOR', 'ADMIN'), async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
-      
+      const updatedStatus = 'IN_PROGRESS';
+      const newPriority = calculatePriority({ status: updatedStatus });
+
       const task = await prisma.task.update({
         where: { id: taskId },
         data: {
-          status: 'IN_PROGRESS',
+          status: updatedStatus,
           claimedAt: new Date(),
+          sortPriority: newPriority
         },
         include: { originalVideo: true, channel: true, creator: true }
       });
@@ -324,24 +447,37 @@ module.exports = (io) => {
   router.patch('/:id', protect, authorize('ADMIN', 'MANAGER'), async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
-      const { deadline, scheduledAt, creatorId } = req.body;
-      const current = await prisma.task.findUnique({ where: { id: taskId } });
-      let updatedStatus = current.status;
-      if (creatorId && parseInt(creatorId) !== current.creatorId) updatedStatus = 'IN_PROGRESS';
+      const { scheduledAt, creatorId } = req.body;
       
+      const current = await prisma.task.findUnique({ where: { id: taskId } });
+      if (!current) return res.status(404).json({ error: "Задача не найдена" });
+
+      let dataToUpdate = {};
+      if (scheduledAt !== undefined) dataToUpdate.scheduledAt = scheduledAt ? new Date(scheduledAt) : null;
+      
+      // Меняем автора только если задача еще "Новая"
+      if (creatorId !== undefined && current.status === 'AWAITING_REACTION') {
+        dataToUpdate.creatorId = creatorId ? parseInt(creatorId) : null;
+      }
+
+      // Рассчитываем приоритет, передавая объект задачи в вашу функцию
+      dataToUpdate.sortPriority = calculatePriority({
+        status: current.status,
+        needsFixing: current.needsFixing
+      });
+
       const updated = await prisma.task.update({
         where: { id: taskId },
-        data: { 
-          deadline: deadline ? new Date(deadline) : null, 
-          scheduledAt: scheduledAt ? new Date(scheduledAt) : null, 
-          creatorId: creatorId ? parseInt(creatorId) : null, 
-          status: updatedStatus 
-        },
-        include: { originalVideo: true, channel: true, creator: { select: { id: true, username: true } }, manager: { select: { id: true, username: true } } }
+        data: dataToUpdate,
+        include: { originalVideo: true, channel: true, creator: { select: { id: true, username: true } } }
       });
-      io.emit('task_updated', appendFileStatus(updated));
-      res.json(appendFileStatus(updated));
-    } catch (err) { res.status(500).json({ error: err.message }); }
+
+      const result = appendFileStatus(updated);
+      io.emit('task_updated', result);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: "Ошибка при обновлении" });
+    }
   });
 
   // Удаление

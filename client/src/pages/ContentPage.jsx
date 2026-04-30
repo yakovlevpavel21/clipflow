@@ -24,7 +24,11 @@ export default function ContentPage() {
   const [tasks, setTasks] = useState([]);
   const [channels, setChannels] = useState([]);
   const [creators, setCreators] = useState([]);
-  const [filters, setFilters] = useState({ channelId: 'all', status: 'all', creatorId: 'all' });
+  const [filters, setFilters] = useState({ 
+    channelId: [], 
+    status: [], 
+    creatorId: [] 
+  });
   
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -63,7 +67,15 @@ export default function ContentPage() {
     else setIsFetchingMore(true);
 
     try {
-      const res = await api.get('/api/tasks/content', { params: { skip, take: 20, ...filters } });
+      const params = {
+        skip,
+        take: 20,
+        channelId: filters.channelId.join(','),
+        status: filters.status.join(','),
+        creatorId: filters.creatorId.join(',')
+      };
+      
+      const res = await api.get('/api/tasks/content', { params });
       setTasks(prev => reset ? res.data : [...prev, ...res.data]);
       setHasMore(res.data.length === 20);
     } catch (e) { setError("Не удалось загрузить контент"); console.log(e);}
@@ -246,10 +258,13 @@ export default function ContentPage() {
           ? prev.map(t => t.id === updatedTask.id ? updatedTask : t)
           : [updatedTask, ...prev];
 
+        // Сортируем по новому весу
         return [...updatedList].sort((a, b) => {
-          const timeA = new Date(a.scheduledAt || a.createdAt).getTime();
-          const timeB = new Date(b.scheduledAt || b.createdAt).getTime();
-          return timeB - timeA;
+          if (a.sortPriority !== b.sortPriority) {
+            return a.sortPriority - b.sortPriority;
+          }
+          // Если приоритет один, более новые сверху
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
         });
       });
 
@@ -299,7 +314,7 @@ export default function ContentPage() {
 
   return (
     <div 
-      className="w-full min-h-screen bg-white dark:bg-[#1f1f1f] transition-colors duration-300"
+      className="w-full min-h-screen bg-[#f9fafb] dark:bg-[#1f1f1f] transition-colors duration-300"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}

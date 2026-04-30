@@ -109,13 +109,24 @@ export default function Profile() {
     <div className="max-w-5xl mx-auto pb-24 px-4 font-['Inter'] transition-colors duration-300">
     
       <div className="flex items-center justify-between py-6 gap-2">
-        {/* Кнопка НАЗАД (теперь компактная на мобилке) */}
         <button
-          onClick={() => navigate(-1)}
-          className="flex items-center justify-center w-10 h-10 md:w-auto md:h-auto md:gap-2 text-slate-500 hover:text-blue-500 transition-all shrink-0"
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (window.history.state && window.history.state.idx > 0) {
+              navigate(-1);
+            } else {
+              navigate('/');
+            }
+          }}
+          className="flex items-center justify-center h-11 px-3 md:px-5 bg-white dark:bg-[#1a1a1a] rounded-xl border border-slate-200 dark:border-[#333333] shadow-sm text-[#d1d1d1] md:text-slate-500 hover:text-blue-500 active:scale-90 transition-all shrink-0 group"
         >
-          <ArrowLeft size={20} />
-          <span className="hidden md:block text-[10px] font-bold uppercase tracking-widest">Назад</span>
+          <ArrowLeft size={18} className="md:group-hover:-translate-x-1 transition-transform" />
+          <span className="hidden md:block ml-2.5 text-[10px] font-bold uppercase tracking-[0.2em] leading-none relative top-[-0.5px]">
+            Назад
+          </span>
         </button>
 
         {/* СЕЛЕКТОР ПЕРИОДА (Один ряд всегда) */}

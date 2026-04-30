@@ -7,10 +7,13 @@ import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ContentPage from './pages/ContentPage';
+import SettingsPage from './pages/SettingsPage';
 import Profile from './pages/Profile';
 import api, { socket } from './api';
+import { useTheme } from './hooks/useTheme';
 
 export default function App() {
+  const { theme } = useTheme();
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
   const [isValidating, setIsValidating] = useState(!!localStorage.getItem('token'));
 
@@ -103,6 +106,7 @@ export default function App() {
             {/* Ограничение оставляем только для страницы системных настроек */}
             {user.role === 'ADMIN' && <Route path="admin" element={<AdminPage />} />}
             
+            <Route path="settings" element={<SettingsPage onLogout={handleLogout} />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

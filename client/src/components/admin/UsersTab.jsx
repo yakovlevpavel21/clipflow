@@ -39,8 +39,12 @@ const UsersTab = ({ users, now, onEdit, onDelete, onAdd }) => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between px-1">
         <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Команда Clipsio</h3>
-        <button onClick={onAdd} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-blue-500/20">
-          <Plus size={14} /> Добавить
+        <button 
+          onClick={onAdd}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-blue-600/20"
+        >
+          <Plus size={16} />
+          <span>Добавить</span>
         </button>
       </div>
 

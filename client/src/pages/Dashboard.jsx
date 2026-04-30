@@ -41,7 +41,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-6xl mx-auto pb-20 px-4 font-['Inter']">
       {/* ПРИВЕТСТВИЕ */}
-      <header className="py-8 md:py-12">
+      <header className="pt-4 pb-10 md:py-12">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
           Привет, {user.username}! 👋
         </h1>

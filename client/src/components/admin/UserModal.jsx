@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, User, Lock, Save, UserPlus, Shield } from 'lucide-react';
 
 export default function UserModal({ user, onClose, onSave }) {
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -23,9 +24,16 @@ export default function UserModal({ user, onClose, onSave }) {
     return () => { document.body.style.overflow = ''; };
   }, [user]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSave(formData);
+    setLoading(true);
+    try {
+      await onSave(formData);
+    } catch (err) {
+      // Ошибка обработана в AdminPage (toast), тут просто ловим чтобы не упало
+    } finally {
+      setLoading(false); // РАЗБЛОКИРУЕМ КНОПКУ
+    }
   };
 
   return (

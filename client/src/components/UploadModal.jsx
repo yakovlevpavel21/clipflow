@@ -12,7 +12,7 @@ export default function UploadModal({ task, onClose, onSuccess }) {
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
@@ -66,11 +66,17 @@ export default function UploadModal({ task, onClose, onSuccess }) {
     setShowUploadZone(true);
   };
 
+  // Хелпер для определения типа видео
+  const getVideoType = (path) => {
+    if (!path) return 'video/mp4';
+    return path.toLowerCase().endsWith('.mov') ? 'video/quicktime' : 'video/mp4';
+  };
+
   return (
-    <div className="fixed inset-0 w-screen h-screen z-[99999] flex items-center justify-center p-0 md:p-4 overflow-hidden font-['Inter']">
+    <div className="fixed inset-0 w-screen h-screen z-[100000] flex items-center justify-center p-0 md:p-4 overflow-hidden font-['Inter']">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={!loading ? onClose : undefined} />
       
-      <div className="relative bg-white dark:bg-[#1f1f1f] w-full max-w-2xl h-full md:h-auto md:max-h-[95vh] md:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-[#333333]">
+      <div className="relative bg-white dark:bg-[#1f1f1f] w-full max-w-2xl h-full md:h-auto md:max-h-[95vh] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-[#333333]">
         
         {/* HEADER */}
         <div className="flex items-center justify-between p-4 md:p-6 border-b border-slate-100 dark:border-[#333333] shrink-0 bg-white dark:bg-[#1f1f1f] z-10">
@@ -96,16 +102,21 @@ export default function UploadModal({ task, onClose, onSuccess }) {
               <PlayCircle size={14} className="text-blue-500" />
               <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Оригинальный ролик</span>
             </div>
-            {/* Исправленный фон: bg-slate-50 dark:bg-black */}
             <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-50 dark:bg-black border border-slate-200 dark:border-[#333333] shadow-sm">
               <video 
-                src={`/${task.originalVideo?.filePath}`} 
                 className="w-full h-full object-contain" 
                 controls 
                 playsInline 
-              />
+                preload="metadata"
+              >
+                <source 
+                  src={`/${task.originalVideo?.filePath}#t=0.001`} 
+                  type={getVideoType(task.originalVideo?.filePath)} 
+                />
+              </video>
             </div>
-            <p className="text-[11px] font-medium text-slate-500 dark:text-[#aaaaaa] italic px-1 line-clamp-1">
+            {/* Исправлено: текст больше, без наклона, темнее в светлой теме */}
+            <p className="text-[13px] font-semibold text-slate-800 dark:text-[#eeeeee] px-1 line-clamp-2">
               {task.originalVideo.title}
             </p>
           </div>
@@ -118,7 +129,6 @@ export default function UploadModal({ task, onClose, onSuccess }) {
                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ваш результат</span>
               </div>
               
-              {/* КНОПКА УДАЛИТЬ / ЗАМЕНИТЬ (Вынесена из плеера) */}
               {!showUploadZone && !loading && (
                 <button 
                   onClick={resetSelection}
@@ -143,18 +153,22 @@ export default function UploadModal({ task, onClose, onSuccess }) {
                   </p>
                 </label>
               ) : (
-                <video 
-                  key={previewUrl || task.reactionFilePath}
-                  src={previewUrl || `/${task.reactionFilePath}`} 
-                  className="w-full h-full object-contain" 
-                  controls 
-                  playsInline 
-                />
+                 <video 
+                    key={previewUrl || task.reactionFilePath}
+                    className="w-full h-full object-contain" 
+                    controls 
+                    playsInline 
+                    preload="metadata"
+                  >
+                    <source 
+                      src={previewUrl ? previewUrl : `/${task.reactionFilePath}#t=0.001`} 
+                      type={getVideoType(previewUrl || task.reactionFilePath)} 
+                    />
+                  </video>
               )}
             </div>
           </div>
 
-          {/* Блок предупреждения если нужны правки */}
           {task.needsFixing && !selectedFile && (
             <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-2xl flex gap-3 animate-in slide-in-from-top-2">
                <AlertCircle className="text-red-500 shrink-0" size={18} />

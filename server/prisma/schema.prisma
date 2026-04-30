@@ -85,6 +85,7 @@ model Channel {
   descriptionFooter   String?  @default("")
   showOriginalLink    Boolean  @default(true)
   originalLinkPrefix  String?  @default("")
+  publishSlots        String?  @default("")
   tasks               Task[]
   createdAt           DateTime @default(now())
 }
@@ -117,6 +118,7 @@ model Task {
   originalVideoId  Int            
   originalVideo    OriginalVideo  @relation(fields: [originalVideoId], references: [id])
   
+  sortPriority     Int            @default(20) 
   priority         String         @default("normal")
   status           TaskStatus     @default(AWAITING_REACTION)
   

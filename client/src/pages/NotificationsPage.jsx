@@ -118,42 +118,7 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Уведомления</h1>
           <p className="text-sm text-slate-500 mt-1">История событий Clipsio</p>
         </div>
-
-        <button 
-          onClick={async () => {
-            const newStatus = !isEnabled;
-            if (newStatus) await subscribeUserToPush();
-            setIsEnabled(newStatus);
-            await updatePreferences({ enabled: newStatus });
-          }}
-          className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all active:scale-95 ${
-            isEnabled ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 dark:bg-[#262626] text-slate-400'
-          }`}
-        >
-          {isEnabled ? <Bell size={16}/> : <BellOff size={16}/>}
-          {isEnabled ? "Включены" : "Выключены"}
-        </button>
       </header>
-
-      {/* MOBILE-ONLY SETTINGS BUTTON (Показываем только на мобилках вместо хедера) */}
-      <div className="md:hidden pt-6 mb-8">
-         <button 
-           onClick={async () => {
-             const newStatus = !isEnabled;
-             setIsEnabled(newStatus);
-             await updatePreferences({ enabled: newStatus });
-           }}
-           className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-[#1a1a1a] rounded-2xl border border-slate-100 dark:border-[#333333]"
-         >
-           <div className="flex items-center gap-3">
-             {isEnabled ? <Bell className="text-blue-500" size={20}/> : <BellOff className="text-slate-400" size={20}/>}
-             <span className="text-[13px] font-bold dark:text-white">Push-уведомления</span>
-           </div>
-           <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${isEnabled ? 'bg-blue-600/10 text-blue-600' : 'bg-slate-200 dark:bg-[#333333] text-slate-500'}`}>
-             {isEnabled ? 'ВКЛ' : 'ВЫКЛ'}
-           </span>
-         </button>
-      </div>
 
       <div className="space-y-8">
         {notifications.length === 0 ? (

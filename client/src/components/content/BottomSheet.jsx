@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Download, ExternalLink, Edit3, Trash2, Clock, PlayCircle } from 'lucide-react';
 import api from '../../api';
@@ -7,6 +7,11 @@ const BottomSheet = ({ task, isManager, onClose, setActivePreview, setEditTarget
   const isPublished = task.status === 'PUBLISHED';
   const hasOriginal = !!task.originalFileExists;
   const hasReaction = !!task.reactionFileExists;
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
 
   return (
     <>
@@ -72,13 +77,12 @@ const BottomSheet = ({ task, isManager, onClose, setActivePreview, setEditTarget
 
             {isManager && (
               <>
-                <div className="h-px bg-slate-100 dark:bg-[#333333] my-2 mx-2" />
-                {!isPublished && (
-                  <MobileMenuBtn 
-                    icon={<Edit3 size={18}/>} label="Изменить задачу" 
-                    onClick={() => { setEditTarget(task); onClose(); }} 
-                  />
-                )}
+                <MobileMenuBtn 
+                  icon={<Edit3 size={18}/>} 
+                  label="Изменить задачу" 
+                  onClick={() => { setEditTarget(task); onClose(); }} 
+                />
+                
                 <MobileMenuBtn 
                   icon={<Trash2 size={18} className="text-red-500" />} 
                   label="Удалить навсегда" color="text-red-500" 

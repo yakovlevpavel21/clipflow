@@ -65,10 +65,14 @@ const ChannelsTab = ({ channels, onAdd, onEdit, onDelete }) => {
             {/* КНОПКА НАСТРОЕК (ВЫЗЫВАЕТ МОДАЛКУ В ADMINPAGE) */}
             <button 
               onClick={() => onEdit(c)}
-              className="w-full mt-auto py-3 bg-slate-50 dark:bg-[#262626] rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white hover:border-blue-500/20 border border-transparent transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+              className="w-full mt-auto py-2.5 px-4 flex items-center justify-center gap-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all active:scale-[0.98]
+                /* СВЕТЛАЯ ТЕМА */
+                bg-gray-50 text-gray-500 border border-gray-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200
+                /* ТЕМНАЯ ТЕМА: Используем прозрачность вместо сплошного цвета */
+                dark:bg-white/5 dark:text-[#d1d1d1] dark:border-white/5 dark:hover:bg-blue-500/10 dark:hover:text-white dark:hover:border-blue-500/30"
             >
-              <Settings2 size={14} /> 
-              Конфигурация
+              <Settings2 size={14} className="opacity-70" /> 
+              <span>Конфигурация</span>
             </button>
           </div>
         ))}
