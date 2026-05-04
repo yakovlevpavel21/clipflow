@@ -3,6 +3,7 @@ import api, { socket, getDownloadUrl } from '../api';
 import { Loader2, Plus, Layers, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import  {useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // Компоненты
 import FilterBar from '../components/content/FilterBar';
@@ -186,9 +187,8 @@ export default function ContentPage() {
 
   const handleDownload = async (task, type = 'original') => {
     const path = type === 'original' ? task.originalVideo?.filePath : task.reactionFilePath;
-    if (!path) return alert("Файл не найден");
+    if (!path) return toast.error("Файл не найден на сервере");
     
-    // Добавляем timestamp, чтобы iOS не подсовывала старый файл из кеша
     const videoFileName = `${Date.now()}_${task.originalVideo.videoId}.mp4`;
     const url = window.location.origin + getDownloadUrl(path, videoFileName);
     
@@ -197,42 +197,50 @@ export default function ContentPage() {
 
     if (isIOS && isStandalone) {
       setIsDownloading(true);
+      // Информируем пользователя
+      const loadingToast = toast.loading("Подготовка видео...");
       
-      // Создаем новый контроллер для этого скачивания
       downloadAbortRef.current = new AbortController();
 
       try {
-        // 1. Загружаем файл с возможностью отмены (signal)
         const response = await fetch(url, { signal: downloadAbortRef.current.signal });
+        if (!response.ok) throw new Error("Server error");
+        
         const blob = await response.blob();
         const file = new File([blob], videoFileName, { type: 'video/mp4' });
 
-        // 2. Пытаемся вызвать окно "Поделиться"
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file] });
-          setIsDownloading(false);
-          return; 
+          toast.dismiss(loadingToast); // Убираем лоадер при успехе
+        } else {
+          throw new Error("Cannot share");
         }
       } catch (err) {
-        // Если это была ручная отмена пользователем — просто выходим
+        toast.dismiss(loadingToast);
         if (err.name === 'AbortError') {
-          console.log("Download cancelled by user");
-          return;
+          toast.info("Скачивание отменено");
+        } else {
+          console.error(err);
+          toast.error("Не удалось подготовить файл. Попробуйте еще раз.");
+          // Фоллбек: пробуем открыть в браузере, если системное окно "Поделиться" забаговалось
+          window.open(url, '_blank', 'noreferrer');
         }
-        console.log("Share sheet failed, falling back to Browser View");
+      } finally {
+        setIsDownloading(false);
       }
-
-      // --- ФОЛЛБЕК (если не сработал share) ---
-      setIsDownloading(false);
-      window.open(url, '_blank', 'noreferrer');
     } else {
-      // Обычная логика для Android и ПК
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = videoFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Логика для Android и ПК
+      try {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = videoFileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Загрузка началась");
+      } catch (e) {
+        toast.error("Ошибка при скачивании");
+      }
     }
   };
 

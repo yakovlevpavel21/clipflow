@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { MoreVertical, Play, PlayCircle, Download, Send, Edit3, CheckCircle2, RefreshCcw, UploadCloud } from 'lucide-react';
 import { DateInfo, StatusIcon, VideoThumbnail } from './Helpers';
 import api from '../../api';
+import { toast } from 'sonner';
 
 const MobileList = ({ 
   tasks, user, isManager, highlightedId, 
@@ -47,12 +48,27 @@ const MobileList = ({
           }
         } else if (isMyTask) {
           if (isNewForMe) {
-            primaryBtn = <FillBtn label="Начать" icon={<Download size={14} />} onClick={() => api.post(`/api/tasks/${task.id}/claim`).then(() => handleDownload(task, 'original'))} color="bg-indigo-600" />;
+            primaryBtn = (
+              <FillBtn 
+                label="Начать" 
+                icon={<Download size={14} />} 
+                onClick={() => {
+                  api.post(`/api/tasks/${task.id}/claim`)
+                    .then(() => {
+                      toast.success("Задача принята в работу");
+                      handleDownload(task, 'original');
+                    })
+                    .catch(() => toast.error("Не удалось принять задачу"));
+                }} 
+                color="bg-indigo-600" 
+              />
+            );
           } else if (task.needsFixing) {
             primaryBtn = <FillBtn label="Исправить" icon={<RefreshCcw size={14}/>} onClick={() => setUploadTarget(task)} color="bg-red-600" />;
           } else if (isUploaded) {
             primaryBtn = <GhostBtn label="Заменить" icon={<RefreshCcw size={14}/>} onClick={() => setUploadTarget(task)} />;
           } else {
+            // Я поставил синий цвет для "Сдать", так как это основное действие в работе
             primaryBtn = <FillBtn label="Сдать" icon={<UploadCloud size={14} />} onClick={() => setUploadTarget(task)} color="bg-amber-600" />;
           }
         }
@@ -110,7 +126,8 @@ const MobileList = ({
 // Вспомогательные компоненты кнопок (фиксированная ширина 140px)
 const FillBtn = ({ label, icon, onClick, color }) => (
   <button 
-    onClick={(e) => { e.stopPropagation(); onClick(); }} 
+    // Важно: передаем 'e' в onClick
+    onClick={(e) => { e.stopPropagation(); onClick(e); }} 
     className={`${color} text-white h-8 w-[140px] rounded-md flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider active:scale-95 transition-all shadow-md shrink-0`}
   >
     {icon} <span className="relative top-[-0.5px]">{label}</span>
@@ -119,7 +136,8 @@ const FillBtn = ({ label, icon, onClick, color }) => (
 
 const GhostBtn = ({ label, icon, onClick, color = "text-slate-600 dark:text-[#d1d1d1]" }) => (
   <button 
-    onClick={(e) => { e.stopPropagation(); onClick(); }} 
+    // Важно: передаем 'e' в onClick
+    onClick={(e) => { e.stopPropagation(); onClick(e); }} 
     className={`${color} h-8 w-[140px] rounded-md flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider border border-slate-200 dark:border-[#333333] active:bg-slate-50 dark:active:bg-white/5 transition-all shrink-0`}
   >
     {icon} <span className="relative top-[-0.5px]">{label}</span>

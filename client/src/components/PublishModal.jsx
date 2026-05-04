@@ -100,25 +100,28 @@ export default function PublishModal({ task, onClose, onSuccess }) {
   };
 
   const onPublish = async () => {
-    if (!youtubeUrl) return toast.error("Введите ссылку!");
-    if (isTitleTooLong) return toast.error("Заголовок слишком длинный!");
+    if (!youtubeUrl) return toast.error("Введите ссылку на Shorts");
     setLoading(true);
     try {
       await api.post(`/api/tasks/${task.id}/publish`, { youtubeUrl, scheduledAt, title, description });
-      toast.success('Опубликовано');
+      toast.success('Видео опубликовано и перенесено в архив');
       onSuccess();
-    } catch (err) { toast.error("Ошибка"); }
-    finally { setLoading(false); }
+    } catch (err) { 
+      toast.error("Ошибка при сохранении данных публикации"); 
+    } finally { setLoading(false); }
   };
 
   const onReject = async () => {
-    if (!rejectionReason) return toast.error("Укажите причину!");
+    if (!rejectionReason) return toast.error("Укажите причину для креатора");
     setLoading(true);
     try {
       await api.post(`/api/tasks/${task.id}/reject`, { reason: rejectionReason });
-      toast.info('Отправлено на правки');
+      toast.info('Задача возвращена креатору с правками');
       onSuccess();
-    } catch (err) { setLoading(false); }
+    } catch (err) { 
+      toast.error("Ошибка при отклонении");
+      setLoading(false); 
+    }
   };
 
   return (

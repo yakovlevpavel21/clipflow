@@ -6,6 +6,7 @@ import {
 import api from '../../api';
 import { StatusBadge, DateInfo, VideoThumbnail } from './Helpers';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const DesktopTable = ({
   tasks, user, isManager, isAdmin, highlightedId,
@@ -73,7 +74,15 @@ const DesktopTable = ({
               }
             } else if (isMyTask) {
               if (isNewTask) {
-                primaryBtn = <FillBtn label="Начать" icon={<Download size={14} />} onClick={() => api.post(`/api/tasks/${task.id}/claim`).then(() => handleDownload(task, 'original'))} color="bg-indigo-600 hover:bg-indigo-700" />;
+                primaryBtn = <FillBtn label="Начать" icon={<Download size={14} />} onClick={(e) => {
+                  e.stopPropagation();
+                  api.post(`/api/tasks/${task.id}/claim`)
+                    .then(() => {
+                      toast.success("Задача принята"); // Уведомление
+                      handleDownload(task, 'original'); // Запуск скачивания
+                    })
+                    .catch(() => toast.error("Ошибка при принятии задачи"));
+                }} color="bg-indigo-600 hover:bg-indigo-700" />;
               } else if (task.needsFixing) {
                 primaryBtn = <FillBtn label="Исправить" icon={<RefreshCcw size={14}/>} onClick={() => setUploadTarget(task)} color="bg-red-600 hover:bg-red-700" />;
               } else if (isUploaded) {

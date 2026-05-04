@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, UploadCloud, Loader2, Check, RefreshCcw, Film, PlayCircle, AlertCircle } from 'lucide-react';
 import api from '../api';
+import { toast } from 'sonner';
 
 export default function UploadModal({ task, onClose, onSuccess }) {
   const [dragActive, setDragActive] = useState(false);
@@ -47,14 +48,28 @@ export default function UploadModal({ task, onClose, onSuccess }) {
 
   const handleFinalUpload = async () => {
     if (!selectedFile) return;
+    
     setLoading(true);
+    // Создаем временное уведомление с лоадером
+    const toastId = toast.loading("Отправка видео на сервер...");
+
     const formData = new FormData();
     formData.append('video', selectedFile);
+    
     try {
       await api.post(`/api/tasks/${task.id}/upload`, formData);
+      
+      // Обновляем тот же тост на успех
+      toast.success('Работа отправлена на проверку', {
+        id: toastId,
+      });
+      
       onSuccess();
     } catch (err) {
-      alert(err.response?.data?.error || "Ошибка при загрузке");
+      // Обновляем тост на ошибку
+      toast.error(err.response?.data?.error || "Ошибка при загрузке", {
+        id: toastId
+      });
       setLoading(false);
     }
   };

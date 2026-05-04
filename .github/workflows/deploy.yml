@@ -26,11 +26,8 @@ jobs:
             # Backend
             cd server
             npm install
-            npx prisma generate
-            
-            # Если миграции застряли, 'migrate deploy' может упасть. 
-            # В этом случае один раз нужно будет починить вручную (см. ниже)
             npx prisma migrate deploy
+            npx prisma generate
             
             # Перезапуск API. Рекомендую использовать имя процесса, а не файл
             pm2 restart clipsio-api || pm2 start index.js --name "clipsio-api"
